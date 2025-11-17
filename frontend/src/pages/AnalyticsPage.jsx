@@ -18,7 +18,7 @@ import { Link } from 'react-router-dom';
 const AnalyticsPage = () => {
   const [activeTab, setActiveTab] = useState('trending');
 
-  // ✅ ADD THIS: Helper to get full image URL
+  // Helper to get full image URL
   const API_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
   
   const getImageUrl = (imagePath) => {
@@ -144,7 +144,7 @@ const AnalyticsPage = () => {
                 <div className="flex items-center gap-3 mb-4">
                   <TrendingUp className="text-primary-500" size={24} />
                   <div>
-                    <h2 className="text-xl font-bold">🔥 Trending Posts</h2>
+                    <h2 className="text-xl font-bold">Trending Posts</h2>
                     <p className="text-sm text-gray-400">
                       Posts dengan engagement tertinggi dalam 24 jam terakhir
                     </p>
@@ -210,7 +210,7 @@ const AnalyticsPage = () => {
 
                           <p className="text-gray-300 mb-4">{post.content}</p>
 
-                          {/* ✅ FIXED: Add getImageUrl */}
+                          {/* Add getImageUrl */}
                           {post.image && (
                             <img 
                               src={getImageUrl(post.image)} 
@@ -263,7 +263,7 @@ const AnalyticsPage = () => {
                 <div className="flex items-center gap-3 mb-4">
                   <Users className="text-primary-500" size={24} />
                   <div>
-                    <h2 className="text-xl font-bold">👑 Top Users</h2>
+                    <h2 className="text-xl font-bold">Top Users</h2>
                     <p className="text-sm text-gray-400">
                       User dengan followers terbanyak
                     </p>
@@ -295,7 +295,7 @@ const AnalyticsPage = () => {
                           {index + 1}
                         </div>
 
-                        {/* Avatar - ✅ FIXED */}
+                        {/* Avatar */}
                         <div className="avatar-ring">
                           <div className="avatar w-16 h-16 bg-dark-800">
                             {user.avatar ? (
@@ -356,7 +356,7 @@ const AnalyticsPage = () => {
                 <div className="flex items-center gap-3 mb-4">
                   <Award className="text-primary-500" size={24} />
                   <div>
-                    <h2 className="text-xl font-bold">🏆 Top Posts</h2>
+                    <h2 className="text-xl font-bold">Top Posts</h2>
                     <p className="text-sm text-gray-400">
                       Posts dengan engagement tertinggi sepanjang masa
                     </p>
@@ -410,7 +410,7 @@ const AnalyticsPage = () => {
 
                           <p className="text-gray-300 mb-4">{post.content}</p>
 
-                          {/* ✅ FIXED: Add getImageUrl for post images */}
+                          {/* Add getImageUrl for post images */}
                           {post.image && (
                             <img 
                               src={getImageUrl(post.image)} 
@@ -460,7 +460,7 @@ const AnalyticsPage = () => {
                 <div className="flex items-center gap-3 mb-4">
                   <Activity className="text-primary-500" size={24} />
                   <div>
-                    <h2 className="text-xl font-bold">📈 Daily Activity</h2>
+                    <h2 className="text-xl font-bold">Daily Activity</h2>
                     <p className="text-sm text-gray-400">
                       Aktivitas harian dalam 7 hari terakhir
                     </p>
