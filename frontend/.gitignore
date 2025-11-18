@@ -100,8 +100,3 @@ storybook-static/
 *.tgz
 <<<<<<< Updated upstream
 .yarn-integrity
-
-package-lock.json
-=======
-.yarn-integrity
->>>>>>> Stashed changes
