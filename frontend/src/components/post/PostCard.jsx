@@ -11,7 +11,10 @@ import {
   Bookmark, 
   MoreHorizontal,
   Trash2,
-  Edit
+  Edit,
+  X,
+  Check,
+  Loader2
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
@@ -21,6 +24,8 @@ const PostCard = ({ post, onUpdate }) => {
   const { user: currentUser } = useAuth();
   const [showComments, setShowComments] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(post.content);
 
   const isOwnPost = currentUser?._id === post.userId._id;
 
@@ -52,6 +57,23 @@ const PostCard = ({ post, onUpdate }) => {
     },
   });
 
+  // Edit mutation
+  const editMutation = useMutation({
+    mutationFn: async (data) => {
+      const response = await api.put(`/posts/${post._id}`, data);
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Post berhasil diupdate');
+      setIsEditing(false);
+      setShowMenu(false);
+      onUpdate();
+    },
+    onError: (error) => {
+      toast.error(error.error || 'Gagal mengupdate post');
+    },
+  });
+
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async () => {
@@ -72,6 +94,25 @@ const PostCard = ({ post, onUpdate }) => {
 
   const handleSave = () => {
     saveMutation.mutate();
+  };
+
+  const handleEdit = () => {
+    setIsEditing(true);
+    setShowMenu(false);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditContent(post.content);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editContent.trim()) {
+      toast.error('Content tidak boleh kosong');
+      return;
+    }
+
+    editMutation.mutate({ content: editContent });
   };
 
   const handleDelete = () => {
@@ -124,15 +165,36 @@ const PostCard = ({ post, onUpdate }) => {
             </button>
 
             {showMenu && (
-              <div className="absolute right-0 mt-2 w-48 card p-2 space-y-1">
-                <button
-                  onClick={handleDelete}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-red-500 hover:bg-dark-800 rounded-lg transition-colors"
-                >
-                  <Trash2 size={18} />
-                  <span>Hapus Post</span>
-                </button>
-              </div>
+              <>
+                {/* Backdrop untuk close menu */}
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowMenu(false)}
+                />
+                
+                {/* Menu dropdown */}
+                <div className="absolute right-0 mt-2 w-48 card p-2 space-y-1 z-20">
+                  <button
+                    onClick={handleEdit}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-blue-500 hover:bg-dark-800 rounded-lg transition-colors"
+                  >
+                    <Edit size={18} />
+                    <span>Edit Post</span>
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleteMutation.isPending}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-red-500 hover:bg-dark-800 rounded-lg transition-colors"
+                  >
+                    {deleteMutation.isPending ? (
+                      <Loader2 size={18} className="animate-spin" />
+                    ) : (
+                      <Trash2 size={18} />
+                    )}
+                    <span>Hapus Post</span>
+                  </button>
+                </div>
+              </>
             )}
           </div>
         )}
@@ -191,15 +253,49 @@ const PostCard = ({ post, onUpdate }) => {
 
       {/* Content */}
       <div className="post-content pb-2">
-        <p className="text-sm">
-          <Link
-            to={`/profile/${post.userId._id}`}
-            className="font-semibold hover:text-gray-300 transition-colors"
-          >
-            {post.userId.username}
-          </Link>{' '}
-          <span className="text-gray-300">{post.content}</span>
-        </p>
+        {isEditing ? (
+          <div className="space-y-2">
+            <textarea
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              className="input w-full min-h-[80px] resize-none"
+              placeholder="Edit caption..."
+              disabled={editMutation.isPending}
+            />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSaveEdit}
+                disabled={editMutation.isPending}
+                className="btn btn-primary btn-sm flex items-center gap-2"
+              >
+                {editMutation.isPending ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Check size={16} />
+                )}
+                <span>Simpan</span>
+              </button>
+              <button
+                onClick={handleCancelEdit}
+                disabled={editMutation.isPending}
+                className="btn btn-secondary btn-sm flex items-center gap-2"
+              >
+                <X size={16} />
+                <span>Batal</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm">
+            <Link
+              to={`/profile/${post.userId._id}`}
+              className="font-semibold hover:text-gray-300 transition-colors"
+            >
+              {post.userId.username}
+            </Link>{' '}
+            <span className="text-gray-300">{post.content}</span>
+          </p>
+        )}
       </div>
 
       {/* Comments Section */}
