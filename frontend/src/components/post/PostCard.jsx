@@ -27,6 +27,12 @@ const PostCard = ({ post, onUpdate }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(post.content);
 
+  // Guard clause - jika user null, jangan render
+  if (!post.userId || !post.userId._id) {
+    console.warn('⚠️  Post with null user:', post._id);
+    return null; // Don't render this post
+  }
+
   const isOwnPost = currentUser?._id === post.userId._id;
 
   // Like mutation
