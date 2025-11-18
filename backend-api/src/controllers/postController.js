@@ -53,14 +53,22 @@ exports.getAllPosts = async (req, res) => {
         const limit = parseInt(req.query.limit) || 20;
         const skip = (page - 1) * limit;
 
+        // ⭐ Tambahkan filter untuk hanya posts dengan userId yang valid
         const posts = await Post.find()
-            .populate('userId', 'username email avatar bio')
+            .populate({
+                path: 'userId',
+                select: 'username email avatar bio',
+                match: { _id: { $exists: true, $ne: null } } // ⭐ Filter user yang ada
+            })
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)
             .lean();
 
-        const postsWithDetails = await Promise.all(posts.map(async (post) => {
+        // ⭐ Filter out posts yang usernya null (orphaned posts)
+        const validPosts = posts.filter(post => post.userId !== null);
+
+        const postsWithDetails = await Promise.all(validPosts.map(async (post) => {
             const [likesCount, commentsCount, isLiked, isSaved] = await Promise.all([
                 Like.countDocuments({ postId: post._id }),
                 Comment.countDocuments({ postId: post._id }),
@@ -86,7 +94,7 @@ exports.getAllPosts = async (req, res) => {
             pagination: {
                 page,
                 limit,
-                total,
+                total: validPosts.length, // ⭐ Update total count
                 pages: Math.ceil(total / limit)
             }
         });
@@ -99,7 +107,7 @@ exports.getAllPosts = async (req, res) => {
     }
 };
 
-// Get feed (following posts)
+// Get feed (following posts) - Apply same fix
 exports.getFeed = async (req, res) => {
     try {
         const currentUserId = req.user.userId;
@@ -115,13 +123,20 @@ exports.getFeed = async (req, res) => {
         followingIds.push(currentUserId);
 
         const posts = await Post.find({ userId: { $in: followingIds } })
-            .populate('userId', 'username email avatar bio')
+            .populate({
+                path: 'userId',
+                select: 'username email avatar bio',
+                match: { _id: { $exists: true, $ne: null } } // ⭐
+            })
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)
             .lean();
 
-        const postsWithDetails = await Promise.all(posts.map(async (post) => {
+        // ⭐ Filter out orphaned posts
+        const validPosts = posts.filter(post => post.userId !== null);
+
+        const postsWithDetails = await Promise.all(validPosts.map(async (post) => {
             const [likesCount, commentsCount, isLiked, isSaved] = await Promise.all([
                 Like.countDocuments({ postId: post._id }),
                 Comment.countDocuments({ postId: post._id }),
@@ -147,7 +162,7 @@ exports.getFeed = async (req, res) => {
             pagination: {
                 page,
                 limit,
-                total,
+                total: validPosts.length,
                 pages: Math.ceil(total / limit)
             }
         });
