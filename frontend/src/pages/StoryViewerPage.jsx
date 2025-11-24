@@ -6,9 +6,8 @@ import toast from 'react-hot-toast';
 import { Loader2, X, Trash2, ArrowLeft, ArrowRight, Eye } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
-import { id as idLocale } from 'date-fns/locale';
 
-// Utility functions (must be defined or imported)
+// Utility functions
 const API_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
 const getMediaUrl = (mediaPath) => {
     if (!mediaPath) return null;
@@ -35,7 +34,7 @@ const StoryViewerPage = () => {
   const defaultDuration = 5000;
   const [currentDuration, setCurrentDuration] = useState(defaultDuration); 
 
-  // Fetch Feed Data untuk menentukan urutan user
+  // Fetch Feed Data
   const { data: feedData } = useQuery({
     queryKey: ['storiesFeed'],
     queryFn: async () => {
@@ -47,13 +46,12 @@ const StoryViewerPage = () => {
     enabled: !!currentUser,
   });
 
-  // Urutan UserID dalam feed
   const userOrder = feedData ? feedData.map(g => g.user._id) : [];
   const currentUserIndexInFeed = userOrder.indexOf(userId);
   const isFirstUser = currentUserIndexInFeed <= 0;
   const isLastUser = currentUserIndexInFeed >= userOrder.length - 1;
 
-  // Fetch stories...
+  // Fetch stories
   const { data: userStories, isLoading, error } = useQuery({
     queryKey: ['userStories', userId],
     queryFn: async () => {
@@ -71,13 +69,21 @@ const StoryViewerPage = () => {
 
   // Mutations
   const viewStoryMutation = useMutation({
-    mutationFn: async (storyId) => { await api.post(`/stories/${storyId}/view`); },
-    onSuccess: () => { queryClient.invalidateQueries(['storiesFeed']); },
+    mutationFn: async (storyId) => { 
+      await api.post(`/stories/${storyId}/view`); 
+    },
+    onSuccess: () => { 
+      queryClient.invalidateQueries(['storiesFeed']);
+      queryClient.invalidateQueries(['userStories', userId]);
+    },
   });
+
   const deleteStoryMutation = useMutation({
-    mutationFn: async (storyId) => { await api.delete(`/stories/${storyId}`); },
+    mutationFn: async (storyId) => { 
+      await api.delete(`/stories/${storyId}`); 
+    },
     onSuccess: () => {
-        toast.success('Story berhasil dihapus');
+        toast.success('Story deleted successfully');
         
         if (userStories.length === 1) {
             handleNextUser(); 
@@ -88,11 +94,12 @@ const StoryViewerPage = () => {
         queryClient.invalidateQueries(['storiesFeed']);
         setShowViewers(false); 
     },
-    onError: (error) => { toast.error(error.error || 'Gagal menghapus story'); }
+    onError: (error) => { 
+      toast.error(error.error || 'Failed to delete story'); 
+    }
   });
 
-
-  // FUNGSI NAVIGASI USER
+  // Navigation functions
   const handleNextUser = useCallback(() => {
     if (!isLastUser) {
       const nextUserId = userOrder[currentUserIndexInFeed + 1];
@@ -111,8 +118,6 @@ const StoryViewerPage = () => {
     }
   }, [isFirstUser, currentUserIndexInFeed, userOrder, navigate]);
 
-
-  // FUNGSI NAVIGASI STORY
   const handleNext = useCallback(() => {
     if (currentStoryIndex < (userStories?.length || 0) - 1) {
       setCurrentStoryIndex(prev => prev + 1); 
@@ -127,11 +132,11 @@ const StoryViewerPage = () => {
     }
   };
 
-  // LOGIC AUTOPLAY & DURATION
+  // Autoplay logic
   useEffect(() => {
     if (isLoading || !currentStory) return;
     
-    // Mark as viewed
+    // Mark as viewed (only once per story)
     if (!isOwnStory && !currentStory.hasViewed && currentStory._id) {
         viewStoryMutation.mutate(currentStory._id);
     }
@@ -145,7 +150,7 @@ const StoryViewerPage = () => {
 
     return () => clearTimeout(timer);
 
-  }, [currentStoryIndex, isPaused, currentDuration, handleNext, isLoading, currentStory]);
+  }, [currentStoryIndex, isPaused, currentDuration, handleNext, isLoading, currentStory, isOwnStory]);
 
   const handleVideoLoad = useCallback(() => {
     if (videoRef.current) {
@@ -159,7 +164,6 @@ const StoryViewerPage = () => {
     }
   }, [isPaused]);
   
-  // Reset states saat story index atau user berubah
   useEffect(() => {
     setIsPaused(false);
     if (currentStory) {
@@ -181,7 +185,6 @@ const StoryViewerPage = () => {
     });
   };
 
-
   if (isLoading || !feedData) {
     return (
       <div className="fixed inset-0 bg-black flex justify-center items-center z-[100]">
@@ -193,15 +196,17 @@ const StoryViewerPage = () => {
   if (error || !currentStory) {
     return (
       <div className="fixed inset-0 bg-black flex flex-col justify-center items-center z-[100] text-white">
-        <p className="mb-4">Story tidak ditemukan atau sudah berakhir.</p>
-        <button onClick={() => navigate('/')} className="btn btn-primary">
-            Kembali ke Home
-        </button>
+        <div className="bg-dark-900 rounded-xl p-8 max-w-md text-center">
+          <p className="mb-4">Story not found or has expired.</p>
+          <button onClick={() => navigate('/')} className="btn btn-primary">
+              Back to Home
+          </button>
+        </div>
       </div>
     );
   }
   
-  // StoryViewersModal (Fixed Modal - 70vh)
+  // Story Viewers Modal
   const StoryViewersModal = ({ story, onClose }) => {
     const { data: viewers, isLoading: viewersLoading, error: viewersError } = useQuery({
       queryKey: ['storyViewers', story._id],
@@ -212,39 +217,49 @@ const StoryViewerPage = () => {
       enabled: showViewers,
     });
 
+    // Group viewers by userId to remove duplicates
+    const uniqueViewers = viewers?.reduce((acc, viewer) => {
+      const existingViewer = acc.find(v => v.userId._id === viewer.userId._id);
+      if (!existingViewer) {
+        acc.push(viewer);
+      } else if (new Date(viewer.viewedAt) > new Date(existingViewer.viewedAt)) {
+        // Keep the most recent view
+        const index = acc.indexOf(existingViewer);
+        acc[index] = viewer;
+      }
+      return acc;
+    }, []);
+
     return (
         <div 
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[110] flex justify-center items-end transition-opacity duration-300"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex justify-center items-end transition-opacity duration-300"
           onClick={(e) => { 
             if (e.target === e.currentTarget) {
                 onClose();
             }
           }}
         >
-            {/* Modal Content - Fixed Height (70vh) */}
             <div 
               className="w-full max-w-md bg-dark-900 shadow-2xl rounded-t-xl flex flex-col transition-all duration-300 transform translate-y-0"
               style={{ height: '70vh' }} 
             >
-                {/* Header (Sederhana) */}
                 <div className="flex justify-between items-center p-4 pt-3 flex-shrink-0 border-b border-dark-800">
-                    <h3 className="text-xl font-bold">Viewers ({story.viewersCount})</h3>
+                    <h3 className="text-xl font-bold">Viewers ({uniqueViewers?.length || 0})</h3>
                     <button onClick={onClose} className="btn-ghost p-2">
                         <X size={24} />
                     </button>
                 </div>
                 
-                {/* Konten Scrollable */}
                 {viewersLoading ? (
                     <div className="flex justify-center py-8 flex-1">
                         <Loader2 className="animate-spin text-primary-500" size={24} />
                     </div>
                 ) : viewersError ? (
-                    <p className="text-red-500 p-4">Gagal memuat viewers</p>
-                ) : (
-                    <div className="flex-1 overflow-y-auto px-4 pb-4"> 
+                    <p className="text-red-500 p-4">Failed to load viewers</p>
+                ) : uniqueViewers && uniqueViewers.length > 0 ? (
+                    <div className="flex-1 overflow-y-auto px-4 pb-4 scrollbar-thin scrollbar-thumb-dark-700 scrollbar-track-dark-900"> 
                         <div className="space-y-3 pt-4">
-                            {viewers.map(viewer => (
+                            {uniqueViewers.map(viewer => (
                                 <Link 
                                     key={viewer.userId._id} 
                                     to={`/profile/${viewer.userId._id}`}
@@ -253,53 +268,67 @@ const StoryViewerPage = () => {
                                 >
                                     <div className="avatar w-10 h-10 bg-dark-800">
                                         {viewer.userId.avatar ? (
-                                          <img src={getMediaUrl(viewer.userId.avatar)} alt={viewer.userId.username} className="w-full h-full object-cover" />
+                                          <img 
+                                            src={getMediaUrl(viewer.userId.avatar)} 
+                                            alt={viewer.userId.username} 
+                                            className="w-full h-full object-cover" 
+                                          />
                                         ) : (
-                                          <span className="text-sm font-semibold">{viewer.userId.username.charAt(0).toUpperCase()}</span>
+                                          <span className="text-sm font-semibold">
+                                            {viewer.userId.username.charAt(0).toUpperCase()}
+                                          </span>
                                         )}
                                     </div>
                                     <div className="flex-1">
                                         <p className="font-semibold">{viewer.userId.username}</p>
-                                        <p className="text-xs text-gray-400">Viewed {formatDistanceToNow(new Date(viewer.viewedAt), { addSuffix: true, locale: idLocale })}</p>
+                                        <p className="text-xs text-gray-400">
+                                          Viewed {formatDistanceToNow(new Date(viewer.viewedAt), { addSuffix: true })}
+                                        </p>
                                     </div>
-                                    {/* ❌ Ikon X/Delete Dihilangkan */}
                                 </Link>
                             ))}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                        <div className="text-center py-8">
+                            <div className="w-16 h-16 bg-dark-800 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <Eye size={24} className="text-gray-500" />
+                            </div>
+                            <p className="text-gray-400 text-sm">No views yet</p>
                         </div>
                     </div>
                 )}
             </div>
         </div>
     );
-  }
-
+  };
 
   return (
     <div className="fixed inset-0 bg-black flex justify-center items-center z-[100] text-white">
         
-        {/* 🆕 WRAPPER UTAMA: MENCANGKUP STORY CONTENT DAN TOMBOL NAVIGASI USER */}
         <div className="w-full h-full max-w-lg flex items-center justify-center relative"> 
 
-            {/* 🆕 BUTTON PREV USER (di sisi kiri) */}
+            {/* Button Prev User */}
             <button
                 onClick={handlePrevUser}
                 disabled={isFirstUser}
-                className={`flex-shrink-0 p-2 z-50 transition-opacity rounded-r-lg ${
+                className={`flex-shrink-0 p-3 z-50 transition-all bg-dark-800/50 hover:bg-dark-700/50 rounded-full ${
                     !isFirstUser ? 'opacity-100' : 'opacity-0 pointer-events-none'
                 }`}
             >
                 <ArrowLeft size={24} /> 
             </button>
             
-            {/* STORY FRAME UTAMA (MAX-W-MD) */}
-            <div className="w-full h-full max-w-md bg-dark-900 relative mx-2">
+            {/* Story Frame */}
+            <div className="w-full h-full max-w-md bg-black relative mx-2 rounded-xl overflow-hidden shadow-2xl">
                 
                 {/* Background Image/Video */}
-                <div className={`absolute inset-0 bg-black flex items-center justify-center ${isPaused ? '' : 'animate-pulse-light'}`}>
+                <div className="absolute inset-0 bg-black flex items-center justify-center">
                     {isVideoMedia ? (
                         <video
                             ref={videoRef}
-                            key={currentStoryIndex} // Key untuk reset video
+                            key={currentStoryIndex}
                             src={mediaUrl}
                             autoPlay={!isPaused}
                             onCanPlayThrough={handleVideoLoad}
@@ -311,7 +340,7 @@ const StoryViewerPage = () => {
                         />
                     ) : (
                         <img
-                            key={currentStoryIndex} // Key untuk reset gambar
+                            key={currentStoryIndex}
                             src={mediaUrl}
                             alt="Story Media"
                             className="w-full h-full object-contain"
@@ -320,7 +349,7 @@ const StoryViewerPage = () => {
                     )}
                 </div>
                 
-                {/* Progress Bars (Indicators) */}
+                {/* Progress Bars */}
                 <div className="absolute top-0 left-0 right-0 p-2 flex gap-1 z-30">
                 {userStories.map((story, index) => {
                     const isCompleted = index < currentStoryIndex;
@@ -328,16 +357,14 @@ const StoryViewerPage = () => {
                     
                     return (
                         <div 
-                        key={story._id} // Gunakan ID story sebagai key
+                        key={story._id}
                         className="flex-1 h-1 bg-white/30 rounded-full overflow-hidden"
                         >
                         <div
                             key={currentStoryIndex === index ? 'active' : `done-${index}`} 
-                            
                             className={`h-full bg-white story-progress-animation ${
                                 isActive ? 'story-progress-animation' : ''
                             } ${isPaused ? 'paused' : 'running'}`}
-                            
                             style={{ 
                                 transform: isCompleted ? 'translateX(0)' : 'translateX(-100%)',
                                 animationDuration: isActive ? `${currentDuration}ms` : '0ms',
@@ -356,76 +383,80 @@ const StoryViewerPage = () => {
                         <Link to={`/profile/${currentStory.userId._id}`}>
                             <div className="avatar w-10 h-10 bg-dark-800 border-2 border-white">
                                 {currentStory.userId.avatar ? (
-                                    <img src={getMediaUrl(currentStory.userId.avatar)} alt={currentStory.userId.username} className="w-full h-full object-cover" />
+                                    <img 
+                                      src={getMediaUrl(currentStory.userId.avatar)} 
+                                      alt={currentStory.userId.username} 
+                                      className="w-full h-full object-cover" 
+                                    />
                                 ) : (
-                                    <span className="text-sm font-semibold">{currentStory.userId.username.charAt(0).toUpperCase()}</span>
+                                    <span className="text-sm font-semibold">
+                                      {currentStory.userId.username.charAt(0).toUpperCase()}
+                                    </span>
                                 )}
                             </div>
                         </Link>
                         <div>
-                            <Link to={`/profile/${currentStory.userId._id}`} className="font-semibold text-white hover:underline">
+                            <Link 
+                              to={`/profile/${currentStory.userId._id}`} 
+                              className="font-semibold text-white hover:underline"
+                            >
                                 {currentStory.userId.username}
                             </Link>
                             <p className="text-xs text-gray-300">
-                                {formatDistanceToNow(new Date(currentStory.createdAt), { addSuffix: true, locale: idLocale })}
+                                {formatDistanceToNow(new Date(currentStory.createdAt), { addSuffix: true })}
                             </p>
                         </div>
                     </div>
-                    {/* Tombol Close */}
-                    <button onClick={() => navigate('/')} className="btn-ghost p-2 text-white/70 hover:text-white">
+                    <button 
+                      onClick={() => navigate('/')} 
+                      className="btn-ghost p-2 text-white/70 hover:text-white"
+                    >
                         <X size={24} />
                     </button>
                 </div>
                 
                 {/* Caption */}
                 {currentStory.caption && (
-                    <div className="absolute bottom-16 left-0 right-0 p-4 text-center z-30 bg-black/50">
-                        <p className="text-white text-lg font-medium">{currentStory.caption}</p>
+                    <div className="absolute bottom-20 left-0 right-0 px-4 text-center z-30">
+                        <div className="bg-black/70 backdrop-blur-sm rounded-lg p-3 inline-block max-w-md">
+                            <p className="text-white text-sm font-medium">{currentStory.caption}</p>
+                        </div>
                     </div>
                 )}
                 
-                {/* Footer (Views/Delete) */}
+                {/* Footer */}
                 {isOwnStory ? (
-                    <div className="absolute bottom-0 left-0 right-0 p-4 flex justify-between items-center z-30"> 
-                        
-                        {/* 🆕 Views Counter & Delete Button Container (Tengah Bawah) */}
-                        <div className="flex flex-1 justify-center items-center">
-                            <div className="flex items-center gap-4 bg-black/50 p-2 px-4 rounded-full">
-                                
-                                {/* Views Counter (Tengah Bawah) */}
-                                <button 
-                                    onClick={() => {
-                                        setShowViewers(true);
-                                        setIsPaused(true); // Pause story saat modal dibuka
-                                    }} 
-                                    className="flex items-center gap-2 text-white hover:text-primary-400 transition-colors"
-                                >
-                                    <Eye size={20} />
-                                    <span className="font-semibold text-lg">{currentStory.viewers.length}</span>
-                                </button>
-                                
-                                {/* Garis pemisah */}
-                                <div className="h-4 w-px bg-gray-600"></div> 
-                                
-                                {/* Delete Button */}
-                                <button 
-                                    onClick={() => deleteStoryMutation.mutate(currentStory._id)}
-                                    disabled={deleteStoryMutation.isPending}
-                                    className="flex items-center gap-2 text-red-500 hover:text-red-400 transition-colors"
-                                >
-                                    {deleteStoryMutation.isPending ? <Loader2 size={20} className="animate-spin" /> : <Trash2 size={20} />}
-                                </button>
-                            </div>
+                    <div className="absolute bottom-0 left-0 right-0 p-4 flex justify-center items-center z-30"> 
+                        <div className="flex items-center gap-4 bg-black/70 backdrop-blur-sm p-3 px-6 rounded-full">
+                            <button 
+                                onClick={() => {
+                                    setShowViewers(true);
+                                    setIsPaused(true);
+                                }} 
+                                className="flex items-center gap-2 text-white hover:text-primary-400 transition-colors"
+                            >
+                                <Eye size={20} />
+                                <span className="font-semibold">{currentStory.viewersCount || 0}</span>
+                            </button>
+                            
+                            <div className="h-5 w-px bg-gray-600"></div> 
+                            
+                            <button 
+                                onClick={() => deleteStoryMutation.mutate(currentStory._id)}
+                                disabled={deleteStoryMutation.isPending}
+                                className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-colors"
+                            >
+                                {deleteStoryMutation.isPending ? (
+                                  <Loader2 size={20} className="animate-spin" />
+                                ) : (
+                                  <Trash2 size={20} />
+                                )}
+                            </button>
                         </div>
                     </div>
-                ) : (
-                    <div className="absolute bottom-0 left-0 right-0 p-4 flex justify-center items-center z-30 bg-black/50">
-                        <p className="text-sm text-gray-300">Tap to pause</p>
-                    </div>
-                )}
+                ) : null}
 
-
-                {/* Navigation Click Zones (Pindah Story) */}
+                {/* Navigation Click Zones */}
                 <div className="absolute inset-0 flex justify-between z-20">
                 <div 
                     className="w-1/3 h-full cursor-pointer" 
@@ -449,23 +480,29 @@ const StoryViewerPage = () => {
                 />
                 </div>
             </div>
-            {/* END STORY FRAME UTAMA */}
 
-            {/* 🆕 BUTTON NEXT USER (di sisi kanan) */}
+            {/* Button Next User */}
             <button
                 onClick={handleNextUser} 
                 disabled={isLastUser}
-                className={`flex-shrink-0 p-2 z-50 transition-opacity rounded-l-lg ${
+                className={`flex-shrink-0 p-3 z-50 transition-all bg-dark-800/50 hover:bg-dark-700/50 rounded-full ${
                     !isLastUser ? 'opacity-100' : 'opacity-0 pointer-events-none'
                 }`}
             >
                 <ArrowRight size={24} /> 
             </button>
         </div>
-        {/* END WRAPPER UTAMA */}
         
         {/* Story Viewers Modal */}
-        {showViewers && <StoryViewersModal story={currentStory} onClose={() => { setShowViewers(false); setIsPaused(false); }} />}
+        {showViewers && (
+          <StoryViewersModal 
+            story={currentStory} 
+            onClose={() => { 
+              setShowViewers(false); 
+              setIsPaused(false); 
+            }} 
+          />
+        )}
         
         <style>{`
           @keyframes story-progress {
@@ -483,13 +520,6 @@ const StoryViewerPage = () => {
           }
           .paused.story-progress-animation {
             animation-play-state: paused;
-          }
-          .animate-pulse-light {
-             animation: pulse-light 5s infinite alternate;
-          }
-          @keyframes pulse-light {
-             0% { opacity: 1; }
-             100% { opacity: 0.9; }
           }
         `}</style>
     </div>
