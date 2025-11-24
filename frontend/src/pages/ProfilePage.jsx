@@ -1,14 +1,15 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom'; // ✅ ADD useNavigate
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import PostCard from '../components/post/PostCard';
-import { Loader2, Settings, Grid, Bookmark, UserPlus, UserMinus } from 'lucide-react';
+import { Loader2, Settings, Grid, Bookmark, UserPlus, UserMinus, MessageCircle } from 'lucide-react'; // ✅ ADD MessageCircle
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 
 const ProfilePage = () => {
   const { userId } = useParams();
+  const navigate = useNavigate(); // ✅ ADD
   const { user: currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState('posts'); // 'posts' or 'saved'
 
@@ -56,6 +57,11 @@ const ProfilePage = () => {
     followMutation.mutate();
   };
 
+  // ✅ ADD: Handle send message
+  const handleSendMessage = () => {
+    navigate(`/messages/${userId}`);
+  };
+
   if (profileLoading) {
     return (
       <div className="flex justify-center items-center min-h-[50vh]">
@@ -101,29 +107,41 @@ const ProfilePage = () => {
                   <span>Edit Profile</span>
                 </button>
               ) : (
-                <button
-                  onClick={handleFollow}
-                  disabled={followMutation.isPending}
-                  className={`btn flex items-center gap-2 ${
-                    profile?.isFollowing
-                      ? 'btn-secondary'
-                      : 'btn-primary'
-                  }`}
-                >
-                  {followMutation.isPending ? (
-                    <Loader2 className="animate-spin" size={18} />
-                  ) : profile?.isFollowing ? (
-                    <>
-                      <UserMinus size={18} />
-                      <span>Unfollow</span>
-                    </>
-                  ) : (
-                    <>
-                      <UserPlus size={18} />
-                      <span>Follow</span>
-                    </>
-                  )}
-                </button>
+                <>
+                  {/* Follow/Unfollow Button */}
+                  <button
+                    onClick={handleFollow}
+                    disabled={followMutation.isPending}
+                    className={`btn flex items-center gap-2 ${
+                      profile?.isFollowing
+                        ? 'btn-secondary'
+                        : 'btn-primary'
+                    }`}
+                  >
+                    {followMutation.isPending ? (
+                      <Loader2 className="animate-spin" size={18} />
+                    ) : profile?.isFollowing ? (
+                      <>
+                        <UserMinus size={18} />
+                        <span>Unfollow</span>
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus size={18} />
+                        <span>Follow</span>
+                      </>
+                    )}
+                  </button>
+                  
+                  {/* ✅ ADD: Message Button */}
+                  <button
+                    onClick={handleSendMessage}
+                    className="btn btn-secondary flex items-center gap-2"
+                  >
+                    <MessageCircle size={18} />
+                    <span>Message</span>
+                  </button>
+                </>
               )}
             </div>
 
