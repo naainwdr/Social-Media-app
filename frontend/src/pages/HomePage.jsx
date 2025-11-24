@@ -1,7 +1,9 @@
+// front/src/pages/HomePage.jsx
 import { useQuery } from '@tanstack/react-query';
 import api from '../services/api';
 import PostCard from '../components/post/PostCard';
 import { Loader2 } from 'lucide-react';
+import StoryFeed from '../components/story/StoryFeed';
 
 const HomePage = () => {
   const { data, isLoading, error, refetch } = useQuery({
@@ -33,6 +35,9 @@ const HomePage = () => {
 
   return (
     <div className="max-w-2xl mx-auto">
+      {/* ⬅️ TAMPILAN STORY FEED DI BAGIAN ATAS HOME PAGE */}
+      <StoryFeed />
+      
       {/* Feed */}
       <div className="space-y-4 mt-6">
         {data && data.length > 0 ? (
