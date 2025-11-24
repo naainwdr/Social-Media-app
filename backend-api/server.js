@@ -67,7 +67,7 @@ app.use(express.urlencoded({ extended: true }));
 const logger = require('./src/middleware/logger');
 app.use(logger);
 
-// ✅ SOCKET.IO CONNECTION HANDLING
+// SOCKET.IO CONNECTION HANDLING
 const onlineUsers = new Map(); // Store userId -> socketId mapping
 
 io.on('connection', (socket) => {
@@ -132,7 +132,7 @@ io.on('connection', (socket) => {
     });
 });
 
-// ✅ Make io accessible in routes
+// Make io accessible in routes
 app.set('io', io);
 app.set('onlineUsers', onlineUsers);
 
@@ -143,6 +143,7 @@ app.use('/api/posts', require('./src/routes/postRoutes'));
 app.use('/api/comments', require('./src/routes/commentRoutes'));
 app.use('/api/analytics', require('./src/routes/analyticsRoutes'));
 app.use('/api/messages', require('./src/routes/messageRoutes'));
+app.use('/api/stories', require('./src/routes/storyRoutes'));
 
 // Root route
 app.get('/', (req, res) => {
@@ -156,6 +157,7 @@ app.get('/', (req, res) => {
             comments: '/api/comments',
             analytics: '/api/analytics',
             messages: '/api/messages', 
+            stories: '/api/stories'
         },
         socket: {
             connected: io.engine.clientsCount,
@@ -178,15 +180,11 @@ const PORT = process.env.PORT || 5000;
 (async () => {
     await checkAzureConnection();
 
-// ✅ USE SERVER INSTEAD OF APP
+// USE SERVER INSTEAD OF APP
 server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`📁 Uploads folder: ${path.join(__dirname, 'uploads')}`);
-    console.log(`🔌 Socket.IO ready for connections`); // ✅ ADD
+    console.log(`🔌 Socket.IO ready for connections`);
 });
-    app.listen(PORT, () => {
-        console.log(`🚀 Server running on port ${PORT}`);
-        console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
-    });
 })();
