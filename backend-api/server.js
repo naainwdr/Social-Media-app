@@ -1,14 +1,45 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
-const path = require('path'); // ✅ ADD THIS
+const path = require('path');
 const connectDB = require('./src/config/db');
+const { BlobServiceClient } = require('@azure/storage-blob');
 
 // Load environment variables
 dotenv.config();
 
 // Connect to MongoDB
 connectDB();
+
+const checkAzureConnection = async () => {
+    const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING; //
+    const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME; //
+
+    if (!connectionString || !containerName) {
+        console.warn('⚠️ AZURE CHECK: Connection string atau container name tidak ditemukan. Lanjut tanpa verifikasi Azure.');
+        return;
+    }
+
+    try {
+        const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
+        
+        // Coba mendapatkan client untuk container
+        const containerClient = blobServiceClient.getContainerClient(containerName);
+
+        // Coba memanggil salah satu operasi yang memerlukan koneksi
+        // Kita gunakan exists() untuk verifikasi ringan
+        const containerExists = await containerClient.exists();
+
+        if (containerExists) {
+            console.log(`☁️ AZURE CHECK: Berhasil terkoneksi. Container "${containerName}" ditemukan.`);
+        } else {
+            console.error(`❌ AZURE CHECK: Koneksi berhasil, tetapi container "${containerName}" tidak ditemukan.`);
+            // Anda dapat menambahkan logika untuk membuat container di sini jika diperlukan.
+        }
+    } catch (error) {
+        console.error(`❌ AZURE CHECK: GAGAL koneksi ke Azure Blob Storage. Error: ${error.message}`);
+    }
+};
 
 const app = express();
 
@@ -19,8 +50,6 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Logger middleware
 const logger = require('./src/middleware/logger');
@@ -45,7 +74,7 @@ app.get('/', (req, res) => {
             posts: '/api/posts',
             comments: '/api/comments',
             analytics: '/api/analytics',
-            uploads: '/uploads' // ✅ ADD THIS
+            uploads: '/uploads'
         }
     });
 });
@@ -61,8 +90,11 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`📁 Uploads folder: ${path.join(__dirname, 'uploads')}`); // ✅ ADD THIS
-});
+(async () => {
+    await checkAzureConnection();
+
+    app.listen(PORT, () => {
+        console.log(`🚀 Server running on port ${PORT}`);
+        console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+    });
+})();
