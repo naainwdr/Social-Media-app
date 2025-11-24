@@ -4,6 +4,7 @@ const Post = require('../models/Post');
 const SavedPost = require('../models/SavedPost');
 const Like = require('../models/Like');
 const Comment = require('../models/Comment');
+const Conversation = require('../models/Conversation');
 
 // Get current user
 exports.getCurrentUser = async (req, res) => {
@@ -301,4 +302,45 @@ exports.searchUsers = async (req, res) => {
             error: 'Terjadi kesalahan saat mencari users'
         });
     }
+};
+
+// Get suggested users (users not yet chatted with)
+exports.getSuggestedUsers = async (req, res) => {
+  try {
+    const currentUserId = req.user.userId;
+
+    // Get users that current user has conversations with
+    const conversations = await Conversation.find({
+      participants: currentUserId
+    }).populate('participants', '_id');
+
+    const chattedUserIds = conversations.flatMap(conv => 
+      conv.participants
+        .filter(p => p._id.toString() !== currentUserId.toString())
+        .map(p => p._id)
+    );
+
+    // Get random users excluding current user and chatted users
+    const suggestedUsers = await User.find({
+      _id: { 
+        $nin: [...chattedUserIds, currentUserId]
+      }
+    })
+      .select('username avatar bio')
+      .limit(10);
+
+    console.log(`✅ Found ${suggestedUsers.length} suggested users`);
+
+    res.json({
+      success: true,
+      message: 'Suggested users retrieved successfully',
+      data: suggestedUsers
+    });
+  } catch (error) {
+    console.error('❌ Get suggested users error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Terjadi kesalahan saat mengambil suggested users'
+    });
+  }
 };
