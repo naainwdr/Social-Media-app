@@ -1,6 +1,7 @@
 // front/src/pages/CreatePage.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import CreatePostComponent from '../components/creation/CreatePostComponent';
 import CreateStoryComponent from '../components/creation/CreateStoryComponent';
 import { BookOpen, Film } from 'lucide-react';
@@ -8,6 +9,7 @@ import { BookOpen, Film } from 'lucide-react';
 const CreatePage = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const queryClient = useQueryClient();
     
     const urlParams = new URLSearchParams(location.search);
     const initialTab = urlParams.get('tab') === 'story' ? 'story' : 'post';
@@ -21,6 +23,18 @@ const CreatePage = () => {
     }, [initialTab]);
 
     const handleCreationSuccess = () => {
+        // Invalidate queries untuk trigger refetch
+        if (activeTab === 'post') {
+            // Invalidate feed dan explore posts
+            queryClient.invalidateQueries({ queryKey: ['feed'] });
+            queryClient.invalidateQueries({ queryKey: ['explorePosts'] });
+            queryClient.invalidateQueries({ queryKey: ['userPosts'] });
+        } else {
+            // Invalidate stories feed
+            queryClient.invalidateQueries({ queryKey: ['storiesFeed'] });
+            queryClient.invalidateQueries({ queryKey: ['userStories'] });
+        }
+        
         // Navigasi kembali ke home setelah post/story berhasil
         navigate('/'); 
     }
