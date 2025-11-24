@@ -1,7 +1,9 @@
 const express = require('express');
+const http = require('http'); // ✅ ADD
+const socketIo = require('socket.io'); // ✅ ADD
 const dotenv = require('dotenv');
 const cors = require('cors');
-const path = require('path'); // ✅ ADD THIS
+const path = require('path');
 const connectDB = require('./src/config/db');
 
 // Load environment variables
@@ -11,6 +13,16 @@ dotenv.config();
 connectDB();
 
 const app = express();
+const server = http.createServer(app); // ✅ CREATE HTTP SERVER
+
+// ✅ SETUP SOCKET.IO
+const io = socketIo(server, {
+    cors: {
+        origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+        methods: ['GET', 'POST'],
+        credentials: true
+    }
+});
 
 // Middleware
 app.use(cors({
@@ -25,6 +37,75 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Logger middleware
 const logger = require('./src/middleware/logger');
 app.use(logger);
+
+// ✅ SOCKET.IO CONNECTION HANDLING
+const onlineUsers = new Map(); // Store userId -> socketId mapping
+
+io.on('connection', (socket) => {
+    console.log('🔌 New client connected:', socket.id);
+
+    // User joins with their userId
+    socket.on('join', (userId) => {
+        onlineUsers.set(userId, socket.id);
+        console.log('👤 User joined:', userId, '| Socket:', socket.id);
+        console.log('📊 Online users:', onlineUsers.size);
+        
+        // Broadcast online status to all clients
+        io.emit('user-online', userId);
+    });
+
+    // Handle new message
+    socket.on('send-message', (messageData) => {
+        console.log('📤 Socket message event:', messageData);
+        
+        // Send to receiver if online
+        const receiverSocketId = onlineUsers.get(messageData.receiverId);
+        if (receiverSocketId) {
+            io.to(receiverSocketId).emit('receive-message', messageData);
+            console.log('✅ Message delivered to:', messageData.receiverId);
+        } else {
+            console.log('⚠️ Receiver offline:', messageData.receiverId);
+        }
+    });
+
+    // Handle typing indicator
+    socket.on('typing', ({ userId, receiverId }) => {
+        const receiverSocketId = onlineUsers.get(receiverId);
+        if (receiverSocketId) {
+            io.to(receiverSocketId).emit('user-typing', userId);
+        }
+    });
+
+    socket.on('stop-typing', ({ userId, receiverId }) => {
+        const receiverSocketId = onlineUsers.get(receiverId);
+        if (receiverSocketId) {
+            io.to(receiverSocketId).emit('user-stop-typing', userId);
+        }
+    });
+
+    // Handle disconnect
+    socket.on('disconnect', () => {
+        // Find and remove user from onlineUsers
+        for (const [userId, socketId] of onlineUsers.entries()) {
+            if (socketId === socket.id) {
+                onlineUsers.delete(userId);
+                io.emit('user-offline', userId);
+                console.log('👋 User disconnected:', userId);
+                console.log('📊 Online users:', onlineUsers.size);
+                break;
+            }
+        }
+    });
+
+    // Handle errors
+    socket.on('error', (error) => {
+        console.error('❌ Socket error:', error);
+    });
+});
+
+// ✅ Make io accessible in routes
+app.set('io', io);
+app.set('onlineUsers', onlineUsers);
 
 // Routes
 app.use('/api/auth', require('./src/routes/authRoutes'));
@@ -45,8 +126,13 @@ app.get('/', (req, res) => {
             posts: '/api/posts',
             comments: '/api/comments',
             analytics: '/api/analytics',
-            uploads: '/uploads' // ✅ ADD THIS
-        }
+            messages: '/api/messages', // ✅ ADD
+            uploads: '/uploads'
+        },
+        socket: {
+            connected: io.engine.clientsCount,
+            onlineUsers: onlineUsers.size
+        } // ✅ ADD socket info
     });
 });
 
@@ -61,8 +147,10 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+// ✅ USE SERVER INSTEAD OF APP
+server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`📁 Uploads folder: ${path.join(__dirname, 'uploads')}`); // ✅ ADD THIS
+    console.log(`📁 Uploads folder: ${path.join(__dirname, 'uploads')}`);
+    console.log(`🔌 Socket.IO ready for connections`); // ✅ ADD
 });
