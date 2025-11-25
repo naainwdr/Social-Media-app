@@ -609,40 +609,42 @@ exports.savePost = async (req, res) => {
 exports.getLikes = async (req, res) => {
   try {
     const { id } = req.params;
+    const currentUserId = req.user?.userId;
 
-    const post = await Post.findById(id);
-    if (!post) {
-      return res.status(404).json({
-        success: false,
-        error: "Post tidak ditemukan",
-      });
-    }
-
-    // Get all likes with user info
+    // Ambil semua like untuk post ini
     const likes = await Like.find({ postId: id })
       .populate("userId", "username fullName avatar")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
-    const users = likes.map((like) => ({
-      _id: like.userId._id,
-      username: like.userId.username,
-      fullName: like.userId.fullName,
-      avatar: like.userId.avatar,
-      likedAt: like.createdAt,
-    }));
+    // Ambil semua userId yang sudah difollow oleh current user
+    let followingSet = new Set();
+    if (currentUserId) {
+      const following = await Follower.find({ followerId: currentUserId }).select("followingId").lean();
+      followingSet = new Set(following.map(f => f.followingId.toString()));
+    }
+
+    // Map user dan tambahkan isFollowing
+    const users = likes.map(like => {
+      const user = like.userId;
+      return {
+        _id: user._id,
+        username: user.username,
+        fullName: user.fullName,
+        avatar: user.avatar,
+        likedAt: like.createdAt,
+        isFollowing: followingSet.has(user._id.toString()),
+      };
+    });
 
     res.json({
       success: true,
-      data: {
-        users,
-        total: users.length,
-      },
+      data: { users },
     });
   } catch (error) {
-    console.error("Get likes error:", error);
     res.status(500).json({
       success: false,
-      error: "Terjadi kesalahan",
+      error: "Failed to get likes",
     });
   }
 };
