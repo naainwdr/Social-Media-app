@@ -1,22 +1,34 @@
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import api from '../services/api';
-import PostCard from '../components/post/PostCard';
-import PostDetailModal from '../components/post/PostDetailModal';
-import FollowersModal from '../components/user/FollowersModal';
-import EditProfileModal from '../components/user/EditProfileModal';
-import RecommendedUsers from '../components/user/RecommendedUsers';
-import { Loader2, Settings, Grid, Bookmark, UserPlus, UserMinus, MessageCircle, MapPin, Link as LinkIcon, Calendar } from 'lucide-react';
-import { useState } from 'react';
-import toast from 'react-hot-toast';
-import { formatDistanceToNow } from 'date-fns';
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import api from "../services/api";
+import PostCard from "../components/post/PostCard";
+import PostDetailModal from "../components/post/PostDetailModal";
+import FollowersModal from "../components/user/FollowersModal";
+import EditProfileModal from "../components/user/EditProfileModal";
+import RecommendedUsers from "../components/user/RecommendedUsers";
+import {
+  Loader2,
+  Settings,
+  Grid,
+  Bookmark,
+  UserPlus,
+  UserMinus,
+  MessageCircle,
+  MapPin,
+  Link as LinkIcon,
+  Calendar,
+} from "lucide-react";
+import { useState } from "react";
+import toast from "react-hot-toast";
+import { formatDistanceToNow } from "date-fns";
 
 // Helper to get full media URL
-const API_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+const API_URL =
+  import.meta.env.VITE_API_URL?.replace("/api", "") || "http://localhost:5000";
 const getMediaUrl = (mediaPath) => {
   if (!mediaPath) return null;
-  if (mediaPath.startsWith('http')) return mediaPath;
+  if (mediaPath.startsWith("http")) return mediaPath;
   return `${API_URL}${mediaPath}`;
 };
 
@@ -24,17 +36,21 @@ const ProfilePage = () => {
   const { userId } = useParams();
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
-  const [activeTab, setActiveTab] = useState('posts');
+  const [activeTab, setActiveTab] = useState("posts");
   const [showFollowersModal, setShowFollowersModal] = useState(false);
-  const [followersModalType, setFollowersModalType] = useState('followers');
+  const [followersModalType, setFollowersModalType] = useState("followers");
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState(null);
 
   const isOwnProfile = currentUser?._id === userId;
 
   // Get user profile
-  const { data: profileData, isLoading: profileLoading, refetch: refetchProfile } = useQuery({
-    queryKey: ['profile', userId],
+  const {
+    data: profileData,
+    isLoading: profileLoading,
+    refetch: refetchProfile,
+  } = useQuery({
+    queryKey: ["profile", userId],
     queryFn: async () => {
       const response = await api.get(`/users/${userId}`);
       return response.data.data;
@@ -42,13 +58,17 @@ const ProfilePage = () => {
   });
 
   // Get saved posts
-  const { data: savedPosts, isLoading: savedLoading, refetch: refetchSaved } = useQuery({
-    queryKey: ['savedPosts'],
+  const {
+    data: savedPosts,
+    isLoading: savedLoading,
+    refetch: refetchSaved,
+  } = useQuery({
+    queryKey: ["savedPosts"],
     queryFn: async () => {
-      const response = await api.get('/users/saved');
+      const response = await api.get("/users/saved");
       return response.data.data;
     },
-    enabled: isOwnProfile && activeTab === 'saved',
+    enabled: isOwnProfile && activeTab === "saved",
   });
 
   // Follow/Unfollow mutation
@@ -60,13 +80,13 @@ const ProfilePage = () => {
     onSuccess: (data) => {
       refetchProfile();
       if (data.isFollowing) {
-        toast.success('Successfully followed user');
+        toast.success("Successfully followed user");
       } else {
-        toast.success('Successfully unfollowed user');
+        toast.success("Successfully unfollowed user");
       }
     },
     onError: (error) => {
-      toast.error(error.error || 'Failed to follow/unfollow user');
+      toast.error(error.error || "Failed to follow/unfollow user");
     },
   });
 
@@ -79,12 +99,12 @@ const ProfilePage = () => {
   };
 
   const handleShowFollowers = () => {
-    setFollowersModalType('followers');
+    setFollowersModalType("followers");
     setShowFollowersModal(true);
   };
 
   const handleShowFollowing = () => {
-    setFollowersModalType('following');
+    setFollowersModalType("following");
     setShowFollowersModal(true);
   };
 
@@ -102,12 +122,14 @@ const ProfilePage = () => {
 
   const profile = profileData?.user;
   const posts = profileData?.posts || [];
-  const currentPosts = activeTab === 'posts' ? posts : savedPosts;
-  const currentLoading = activeTab === 'posts' ? false : savedLoading;
+  const currentPosts = activeTab === "posts" ? posts : savedPosts;
+  const currentLoading = activeTab === "posts" ? false : savedLoading;
 
-  const joinedDate = profile?.createdAt ? formatDistanceToNow(new Date(profile.createdAt), {
-    addSuffix: true,
-  }) : '';
+  const joinedDate = profile?.createdAt
+    ? formatDistanceToNow(new Date(profile.createdAt), {
+        addSuffix: true,
+      })
+    : "";
 
   return (
     <div className="max-w-7xl mx-auto pb-6">
@@ -116,167 +138,177 @@ const ProfilePage = () => {
         <div className="lg:col-span-2">
           {/* Profile Header */}
           <div className="card mb-6">
-        {/* Cover Photo Area */}
-        <div className="h-32 bg-gradient-to-r from-primary-500/20 via-pink-500/20 to-purple-500/20 rounded-t-xl"></div>
-        
-        <div className="px-8 pb-8">
-          {/* Avatar & Actions */}
-          <div className="flex items-end justify-between -mt-16 mb-6">
-            <div className="avatar-ring p-1 bg-gradient-instagram">
-              <div className="avatar w-32 h-32 bg-dark-900 border-4 border-dark-900">
-                {profile?.avatar ? (
-                  <img 
-                    src={getMediaUrl(profile.avatar)} 
-                    alt={profile.username} 
-                    className="w-full h-full object-cover" 
-                  />
-                ) : (
-                  <span className="text-4xl font-bold">
-                    {profile?.username?.charAt(0).toUpperCase()}
-                  </span>
-                )}
-              </div>
-            </div>
+            {/* Cover Photo Area */}
+            <div className="h-32 bg-gradient-to-r from-primary-500/20 via-pink-500/20 to-purple-500/20 rounded-t-xl"></div>
 
-            {/* Action Buttons */}
-            <div className="flex items-center gap-3 mb-4">
-              {isOwnProfile ? (
-                <button 
-                  onClick={handleEditProfile}
-                  className="btn btn-secondary flex items-center gap-2 px-6"
-                >
-                  <Settings size={18} />
-                  <span>Edit Profile</span>
-                </button>
-              ) : (
-                <>
-                  <button
-                    onClick={handleFollow}
-                    disabled={followMutation.isPending}
-                    className={`btn flex items-center gap-2 px-6 ${
-                      profile?.isFollowing ? 'btn-secondary' : 'btn-gradient'
-                    }`}
-                  >
-                    {followMutation.isPending ? (
-                      <Loader2 className="animate-spin" size={18} />
-                    ) : profile?.isFollowing ? (
-                      <>
-                        <UserMinus size={18} />
-                        <span>Unfollow</span>
-                      </>
+            <div className="px-8 pb-8">
+              {/* Avatar & Actions */}
+              <div className="flex items-end justify-between -mt-16 mb-6">
+                <div className="avatar-ring p-1 bg-gradient-instagram">
+                  <div className="avatar w-32 h-32 bg-dark-900 border-4 border-dark-900">
+                    {profile?.avatar ? (
+                      <img
+                        src={getMediaUrl(profile.avatar)}
+                        alt={profile.username}
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
-                      <>
-                        <UserPlus size={18} />
-                        <span>Follow</span>
-                      </>
+                      <span className="text-4xl font-bold">
+                        {profile?.username?.charAt(0).toUpperCase()}
+                      </span>
                     )}
-                  </button>
-                  
-                  <button
-                    onClick={handleSendMessage}
-                    className="btn btn-secondary flex items-center gap-2 px-6"
-                  >
-                    <MessageCircle size={18} />
-                    <span>Message</span>
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Profile Info */}
-          <div className="space-y-4">
-            {/* Username & Full Name */}
-            <div>
-              <h1 className="text-2xl font-bold mb-1">{profile?.username}</h1>
-              {profile?.fullName && (
-                <p className="text-gray-400">{profile.fullName}</p>
-              )}
-            </div>
-
-            {/* Bio */}
-            {profile?.bio && (
-              <p className="text-gray-300 leading-relaxed">{profile.bio}</p>
-            )}
-
-            {/* Meta Info */}
-            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400">
-              {profile?.location && (
-                <div className="flex items-center gap-1">
-                  <MapPin size={16} />
-                  <span>{profile.location}</span>
+                  </div>
                 </div>
-              )}
-              {profile?.website && (
-                <a 
-                  href={profile.website} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 hover:text-primary-500 transition-colors"
-                >
-                  <LinkIcon size={16} />
-                  <span>{profile.website}</span>
-                </a>
-              )}
-              <div className="flex items-center gap-1">
-                <Calendar size={16} />
-                <span>Joined {joinedDate}</span>
-              </div>
-            </div>
 
-            {/* Stats */}
-            <div className="flex gap-8 pt-4 border-t border-dark-800">
-              <div className="text-center">
-                <div className="text-xl font-bold">{profile?.postsCount || 0}</div>
-                <div className="text-sm text-gray-400">Posts</div>
+                {/* Action Buttons */}
+                <div className="flex items-center gap-3 mb-4">
+                  {isOwnProfile ? (
+                    <button
+                      onClick={handleEditProfile}
+                      className="btn btn-secondary flex items-center gap-2 px-6"
+                    >
+                      <Settings size={18} />
+                      <span>Edit Profile</span>
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={handleFollow}
+                        disabled={followMutation.isPending}
+                        className={`btn flex items-center gap-2 px-6 ${
+                          profile?.isFollowing
+                            ? "btn-secondary"
+                            : "btn-gradient"
+                        }`}
+                      >
+                        {followMutation.isPending ? (
+                          <Loader2 className="animate-spin" size={18} />
+                        ) : profile?.isFollowing ? (
+                          <>
+                            <UserMinus size={18} />
+                            <span>Unfollow</span>
+                          </>
+                        ) : (
+                          <>
+                            <UserPlus size={18} />
+                            <span>Follow</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={handleSendMessage}
+                        className="btn btn-secondary flex items-center gap-2 px-6"
+                      >
+                        <MessageCircle size={18} />
+                        <span>Message</span>
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-              <button
-                onClick={handleShowFollowers}
-                className="text-center hover:opacity-70 transition-opacity"
-              >
-                <div className="text-xl font-bold">{profile?.followersCount || 0}</div>
-                <div className="text-sm text-gray-400">Followers</div>
-              </button>
-              <button
-                onClick={handleShowFollowing}
-                className="text-center hover:opacity-70 transition-opacity"
-              >
-                <div className="text-xl font-bold">{profile?.followingCount || 0}</div>
-                <div className="text-sm text-gray-400">Following</div>
-              </button>
+
+              {/* Profile Info */}
+              <div className="space-y-4">
+                {/* Username & Full Name */}
+                <div>
+                  <h1 className="text-2xl font-bold mb-1">
+                    {profile?.username}
+                  </h1>
+                  {profile?.fullName && (
+                    <p className="text-gray-400">{profile.fullName}</p>
+                  )}
+                </div>
+
+                {/* Bio */}
+                {profile?.bio && (
+                  <p className="text-gray-300 leading-relaxed">{profile.bio}</p>
+                )}
+
+                {/* Meta Info */}
+                <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400">
+                  {profile?.location && (
+                    <div className="flex items-center gap-1">
+                      <MapPin size={16} />
+                      <span>{profile.location}</span>
+                    </div>
+                  )}
+                  {profile?.website && (
+                    <a
+                      href={profile.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 hover:text-primary-500 transition-colors"
+                    >
+                      <LinkIcon size={16} />
+                      <span>{profile.website}</span>
+                    </a>
+                  )}
+                  <div className="flex items-center gap-1">
+                    <Calendar size={16} />
+                    <span>Joined {joinedDate}</span>
+                  </div>
+                </div>
+
+                {/* Stats */}
+                <div className="flex gap-8 pt-4 border-t border-dark-800">
+                  <div className="text-center">
+                    <div className="text-xl font-bold">
+                      {profile?.postsCount || 0}
+                    </div>
+                    <div className="text-sm text-gray-400">Posts</div>
+                  </div>
+                  <button
+                    onClick={handleShowFollowers}
+                    className="text-center hover:opacity-70 transition-opacity"
+                  >
+                    <div className="text-xl font-bold">
+                      {profile?.followersCount || 0}
+                    </div>
+                    <div className="text-sm text-gray-400">Followers</div>
+                  </button>
+                  <button
+                    onClick={handleShowFollowing}
+                    className="text-center hover:opacity-70 transition-opacity"
+                  >
+                    <div className="text-xl font-bold">
+                      {profile?.followingCount || 0}
+                    </div>
+                    <div className="text-sm text-gray-400">Following</div>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
 
           {/* Tabs */}
           <div className="card mb-6">
             <div className="flex justify-center border-b border-dark-800">
-          <button
-            onClick={() => setActiveTab('posts')}
-            className={`flex items-center gap-2 px-8 py-4 border-b-2 transition-colors font-semibold ${
-              activeTab === 'posts'
-                ? 'border-primary-500 text-white'
-                : 'border-transparent text-gray-400 hover:text-white hover:border-dark-700'
-            }`}
-          >
-            <Grid size={20} />
-            <span>POSTS</span>
-          </button>
-          
-          {isOwnProfile && (
-            <button
-              onClick={() => setActiveTab('saved')}
-              className={`flex items-center gap-2 px-8 py-4 border-b-2 transition-colors font-semibold ${
-                activeTab === 'saved'
-                  ? 'border-primary-500 text-white'
-                  : 'border-transparent text-gray-400 hover:text-white hover:border-dark-700'
-              }`}
-            >
-              <Bookmark size={20} />
-              <span>SAVED</span>
-            </button>
-          )}
+              <button
+                onClick={() => setActiveTab("posts")}
+                className={`flex items-center gap-2 px-8 py-4 border-b-2 transition-colors font-semibold ${
+                  activeTab === "posts"
+                    ? "border-primary-500 text-white"
+                    : "border-transparent text-gray-400 hover:text-white hover:border-dark-700"
+                }`}
+              >
+                <Grid size={20} />
+                <span>POSTS</span>
+              </button>
+
+              {isOwnProfile && (
+                <button
+                  onClick={() => setActiveTab("saved")}
+                  className={`flex items-center gap-2 px-8 py-4 border-b-2 transition-colors font-semibold ${
+                    activeTab === "saved"
+                      ? "border-primary-500 text-white"
+                      : "border-transparent text-gray-400 hover:text-white hover:border-dark-700"
+                  }`}
+                >
+                  <Bookmark size={20} />
+                  <span>SAVED</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -288,14 +320,16 @@ const ProfilePage = () => {
           ) : currentPosts && currentPosts.length > 0 ? (
             <div className="space-y-6">
               {currentPosts.map((post) => (
-                <div 
+                <div
                   key={post._id}
                   onClick={() => setSelectedPostId(post._id)}
                   className="cursor-pointer"
                 >
                   <PostCard
                     post={post}
-                    onUpdate={activeTab === 'posts' ? refetchProfile : refetchSaved}
+                    onUpdate={
+                      activeTab === "posts" ? refetchProfile : refetchSaved
+                    }
                   />
                 </div>
               ))}
@@ -303,19 +337,19 @@ const ProfilePage = () => {
           ) : (
             <div className="card p-12 text-center bg-gradient-to-br from-dark-900 to-black border border-dark-800">
               <div className="w-20 h-20 bg-dark-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                {activeTab === 'posts' ? (
+                {activeTab === "posts" ? (
                   <span className="text-4xl">📸</span>
                 ) : (
                   <span className="text-4xl">🔖</span>
                 )}
               </div>
               <h3 className="text-xl font-semibold mb-2">
-                {activeTab === 'posts' ? 'No posts yet' : 'No saved posts'}
+                {activeTab === "posts" ? "No posts yet" : "No saved posts"}
               </h3>
               <p className="text-gray-400">
-                {activeTab === 'posts' 
-                  ? 'Share your first post to get started' 
-                  : 'Posts you save will appear here'}
+                {activeTab === "posts"
+                  ? "Share your first post to get started"
+                  : "Posts you save will appear here"}
               </p>
             </div>
           )}
@@ -355,7 +389,7 @@ const ProfilePage = () => {
         <PostDetailModal
           postId={selectedPostId}
           onClose={() => setSelectedPostId(null)}
-          onUpdate={activeTab === 'posts' ? refetchProfile : refetchSaved}
+          onUpdate={activeTab === "posts" ? refetchProfile : refetchSaved}
         />
       )}
     </div>

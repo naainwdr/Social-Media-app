@@ -1,15 +1,16 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
-import api from '../../services/api';
-import { UserPlus, Loader2 } from 'lucide-react';
-import toast from 'react-hot-toast';
-import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import api from "../../services/api";
+import { UserPlus, Loader2 } from "lucide-react";
+import toast from "react-hot-toast";
+import { useState } from "react";
 
 // Helper to get full media URL
-const API_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+const API_URL =
+  import.meta.env.VITE_API_URL?.replace("/api", "") || "http://localhost:5000";
 const getMediaUrl = (mediaPath) => {
   if (!mediaPath) return null;
-  if (mediaPath.startsWith('http')) return mediaPath;
+  if (mediaPath.startsWith("http")) return mediaPath;
   return `${API_URL}${mediaPath}`;
 };
 
@@ -20,7 +21,7 @@ const RecommendedUsers = ({ limit = 5 }) => {
 
   // Get recommended users
   const { data: recommendedData, isLoading } = useQuery({
-    queryKey: ['recommendedUsers', limit],
+    queryKey: ["recommendedUsers", limit],
     queryFn: async () => {
       const response = await api.get(`/users/recommended?limit=${limit}`);
       return response.data.data;
@@ -35,12 +36,12 @@ const RecommendedUsers = ({ limit = 5 }) => {
     },
     onSuccess: (data) => {
       const { userId } = data;
-      setFollowingUsers(prev => new Set([...prev, userId]));
-      toast.success('Successfully followed user');
-      queryClient.invalidateQueries(['recommendedUsers']);
+      setFollowingUsers((prev) => new Set([...prev, userId]));
+      toast.success("Successfully followed user");
+      queryClient.invalidateQueries(["recommendedUsers"]);
     },
     onError: (error) => {
-      toast.error(error.error || 'Failed to follow user');
+      toast.error(error.error || "Failed to follow user");
     },
   });
 
@@ -75,7 +76,8 @@ const RecommendedUsers = ({ limit = 5 }) => {
       <div className="space-y-3">
         {recommendedData.map((user) => {
           const isFollowing = followingUsers.has(user._id);
-          const isPending = followMutation.isPending && followMutation.variables === user._id;
+          const isPending =
+            followMutation.isPending && followMutation.variables === user._id;
 
           return (
             <div key={user._id} className="flex items-center gap-3">
@@ -86,8 +88,8 @@ const RecommendedUsers = ({ limit = 5 }) => {
               >
                 <div className="avatar w-10 h-10">
                   {user.avatar ? (
-                    <img 
-                      src={getMediaUrl(user.avatar)} 
+                    <img
+                      src={getMediaUrl(user.avatar)}
                       alt={user.username}
                       className="w-full h-full object-cover"
                     />
@@ -132,7 +134,9 @@ const RecommendedUsers = ({ limit = 5 }) => {
                 </button>
               )}
               {isFollowing && (
-                <span className="text-xs text-gray-400 font-medium">Following</span>
+                <span className="text-xs text-gray-400 font-medium">
+                  Following
+                </span>
               )}
             </div>
           );

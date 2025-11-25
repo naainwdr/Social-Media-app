@@ -1,336 +1,343 @@
-const User = require('../models/User');
-const Follower = require('../models/Follower');
-const Post = require('../models/Post');
-const SavedPost = require('../models/SavedPost');
-const Like = require('../models/Like');
-const Comment = require('../models/Comment');
-const Conversation = require('../models/Conversation');
+const User = require("../models/User");
+const Follower = require("../models/Follower");
+const Post = require("../models/Post");
+const SavedPost = require("../models/SavedPost");
+const Like = require("../models/Like");
+const Comment = require("../models/Comment");
+const Conversation = require("../models/Conversation");
 
 // Get current user
 exports.getCurrentUser = async (req, res) => {
-    try {
-        const userId = req.user.userId;
-        const user = await User.findById(userId).select('-password');
+  try {
+    const userId = req.user.userId;
+    const user = await User.findById(userId).select("-password");
 
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                error: 'User tidak ditemukan'
-            });
-        }
-
-        res.json({
-            success: true,
-            message: 'Current user retrieved successfully',
-            data: user
-        });
-    } catch (error) {
-        console.error('Get current user error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Terjadi kesalahan saat mengambil data user'
-        });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: "User tidak ditemukan",
+      });
     }
+
+    res.json({
+      success: true,
+      message: "Current user retrieved successfully",
+      data: user,
+    });
+  } catch (error) {
+    console.error("Get current user error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Terjadi kesalahan saat mengambil data user",
+    });
+  }
 };
 
 // Get user profile by ID
 exports.getUserProfile = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const currentUserId = req.user.userId;
+  try {
+    const { id } = req.params;
+    const currentUserId = req.user.userId;
 
-        const user = await User.findById(id).select('-password').lean();
+    const user = await User.findById(id).select("-password").lean();
 
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                error: 'User tidak ditemukan'
-            });
-        }
-
-        // Get counts
-        const [postsCount, followersCount, followingCount, isFollowing] = await Promise.all([
-            Post.countDocuments({ userId: id }),
-            Follower.countDocuments({ followingId: id }),
-            Follower.countDocuments({ followerId: id }),
-            Follower.exists({ followerId: currentUserId, followingId: id })
-        ]);
-
-        // Get user posts
-        const posts = await Post.find({ userId: id })
-            .populate('userId', 'username avatar')
-            .sort({ createdAt: -1 })
-            .lean();
-
-        // Add interaction data to posts
-        const postsWithDetails = await Promise.all(posts.map(async (post) => {
-            const [likesCount, commentsCount, isLiked, isSaved] = await Promise.all([
-                Like.countDocuments({ postId: post._id }),
-                Comment.countDocuments({ postId: post._id }),
-                Like.exists({ postId: post._id, userId: currentUserId }),
-                SavedPost.exists({ postId: post._id, userId: currentUserId })
-            ]);
-
-            return {
-                ...post,
-                likesCount,
-                commentsCount,
-                isLiked: !!isLiked,
-                isSaved: !!isSaved
-            };
-        }));
-
-        res.json({
-            success: true,
-            message: 'User profile retrieved successfully',
-            data: {
-                user: {
-                    ...user,
-                    postsCount,
-                    followersCount,
-                    followingCount,
-                    isFollowing: !!isFollowing
-                },
-                posts: postsWithDetails
-            }
-        });
-    } catch (error) {
-        console.error('Get user profile error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Terjadi kesalahan saat mengambil profile user'
-        });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: "User tidak ditemukan",
+      });
     }
+
+    // Get counts
+    const [postsCount, followersCount, followingCount, isFollowing] =
+      await Promise.all([
+        Post.countDocuments({ userId: id }),
+        Follower.countDocuments({ followingId: id }),
+        Follower.countDocuments({ followerId: id }),
+        Follower.exists({ followerId: currentUserId, followingId: id }),
+      ]);
+
+    // Get user posts
+    const posts = await Post.find({ userId: id })
+      .populate("userId", "username avatar")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Add interaction data to posts
+    const postsWithDetails = await Promise.all(
+      posts.map(async (post) => {
+        const [likesCount, commentsCount, isLiked, isSaved] = await Promise.all(
+          [
+            Like.countDocuments({ postId: post._id }),
+            Comment.countDocuments({ postId: post._id }),
+            Like.exists({ postId: post._id, userId: currentUserId }),
+            SavedPost.exists({ postId: post._id, userId: currentUserId }),
+          ]
+        );
+
+        return {
+          ...post,
+          likesCount,
+          commentsCount,
+          isLiked: !!isLiked,
+          isSaved: !!isSaved,
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      message: "User profile retrieved successfully",
+      data: {
+        user: {
+          ...user,
+          postsCount,
+          followersCount,
+          followingCount,
+          isFollowing: !!isFollowing,
+        },
+        posts: postsWithDetails,
+      },
+    });
+  } catch (error) {
+    console.error("Get user profile error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Terjadi kesalahan saat mengambil profile user",
+    });
+  }
 };
 
 // Update profile
 exports.updateProfile = async (req, res) => {
-    try {
-        const { username, bio } = req.body;
-        const userId = req.user.userId;
-        const file = req.file;
+  try {
+    const { username, bio } = req.body;
+    const userId = req.user.userId;
+    const file = req.file;
 
-        console.log('📝 Updating profile for user:', userId);
-        console.log('📦 Update data:', { username, bio, hasFile: !!file });
+    console.log("📝 Updating profile for user:", userId);
+    console.log("📦 Update data:", { username, bio, hasFile: !!file });
 
-        // Validation
-        if (username && username.trim().length < 3) {
-            return res.status(400).json({
-                success: false,
-                error: 'Username must be at least 3 characters'
-            });
-        }
-
-        if (bio && bio.length > 150) {
-            return res.status(400).json({
-                success: false,
-                error: 'Bio must be less than 150 characters'
-            });
-        }
-
-        // Check if username is already taken (if changing username)
-        if (username) {
-            const existingUser = await User.findOne({ 
-                username: username.trim(),
-                _id: { $ne: userId }
-            });
-
-            if (existingUser) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Username already taken'
-                });
-            }
-        }
-
-        // Build update object
-        const updateData = {};
-        if (username) updateData.username = username.trim();
-        if (bio !== undefined) updateData.bio = bio.trim();
-        
-        // ✅ Handle avatar upload - req.file.filename is already Azure URL from middleware
-        if (file) {
-            updateData.avatar = file.filename; // This is the full Azure Blob URL
-            console.log('📷 Avatar URL from Azure:', file.filename);
-        }
-
-        // Update user
-        const updatedUser = await User.findByIdAndUpdate(
-            userId,
-            updateData,
-            { new: true }
-        ).select('-password');
-
-        if (!updatedUser) {
-            return res.status(404).json({
-                success: false,
-                error: 'User not found'
-            });
-        }
-
-        console.log('✅ Profile updated successfully');
-
-        res.json({
-            success: true,
-            message: 'Profile updated successfully',
-            data: updatedUser
-        });
-    } catch (error) {
-        console.error('❌ Update profile error:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message || 'Failed to update profile'
-        });
+    // Validation
+    if (username && username.trim().length < 3) {
+      return res.status(400).json({
+        success: false,
+        error: "Username must be at least 3 characters",
+      });
     }
+
+    if (bio && bio.length > 150) {
+      return res.status(400).json({
+        success: false,
+        error: "Bio must be less than 150 characters",
+      });
+    }
+
+    // Check if username is already taken (if changing username)
+    if (username) {
+      const existingUser = await User.findOne({
+        username: username.trim(),
+        _id: { $ne: userId },
+      });
+
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          error: "Username already taken",
+        });
+      }
+    }
+
+    // Build update object
+    const updateData = {};
+    if (username) updateData.username = username.trim();
+    if (bio !== undefined) updateData.bio = bio.trim();
+
+    // ✅ Handle avatar upload - req.file.filename is already Azure URL from middleware
+    if (file) {
+      updateData.avatar = file.filename; // This is the full Azure Blob URL
+      console.log("📷 Avatar URL from Azure:", file.filename);
+    }
+
+    // Update user
+    const updatedUser = await User.findByIdAndUpdate(userId, updateData, {
+      new: true,
+    }).select("-password");
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        error: "User not found",
+      });
+    }
+
+    console.log("✅ Profile updated successfully");
+
+    res.json({
+      success: true,
+      message: "Profile updated successfully",
+      data: updatedUser,
+    });
+  } catch (error) {
+    console.error("❌ Update profile error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to update profile",
+    });
+  }
 };
 
 // Follow/Unfollow user
 exports.followUser = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const currentUserId = req.user.userId;
+  try {
+    const { id } = req.params;
+    const currentUserId = req.user.userId;
 
-        // Check if user exists
-        const userToFollow = await User.findById(id);
-        if (!userToFollow) {
-            return res.status(404).json({
-                success: false,
-                error: 'User tidak ditemukan'
-            });
-        }
-
-        // Can't follow yourself
-        if (id === currentUserId) {
-            return res.status(400).json({
-                success: false,
-                error: 'Anda tidak bisa follow diri sendiri'
-            });
-        }
-
-        // Check if already following
-        const existingFollow = await Follower.findOne({
-            followerId: currentUserId,
-            followingId: id
-        });
-
-        if (existingFollow) {
-            // Unfollow
-            await Follower.findByIdAndDelete(existingFollow._id);
-            
-            return res.json({
-                success: true,
-                message: 'Berhasil unfollow user',
-                isFollowing: false
-            });
-        } else {
-            // Follow
-            await Follower.create({
-                followerId: currentUserId,
-                followingId: id
-            });
-            
-            return res.json({
-                success: true,
-                message: 'Berhasil follow user',
-                isFollowing: true
-            });
-        }
-    } catch (error) {
-        console.error('Follow user error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Terjadi kesalahan saat follow/unfollow user'
-        });
+    // Check if user exists
+    const userToFollow = await User.findById(id);
+    if (!userToFollow) {
+      return res.status(404).json({
+        success: false,
+        error: "User tidak ditemukan",
+      });
     }
+
+    // Can't follow yourself
+    if (id === currentUserId) {
+      return res.status(400).json({
+        success: false,
+        error: "Anda tidak bisa follow diri sendiri",
+      });
+    }
+
+    // Check if already following
+    const existingFollow = await Follower.findOne({
+      followerId: currentUserId,
+      followingId: id,
+    });
+
+    if (existingFollow) {
+      // Unfollow
+      await Follower.findByIdAndDelete(existingFollow._id);
+
+      return res.json({
+        success: true,
+        message: "Berhasil unfollow user",
+        isFollowing: false,
+      });
+    } else {
+      // Follow
+      await Follower.create({
+        followerId: currentUserId,
+        followingId: id,
+      });
+
+      return res.json({
+        success: true,
+        message: "Berhasil follow user",
+        isFollowing: true,
+      });
+    }
+  } catch (error) {
+    console.error("Follow user error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Terjadi kesalahan saat follow/unfollow user",
+    });
+  }
 };
 
 // Get saved posts
 exports.getSavedPosts = async (req, res) => {
-    try {
-        const userId = req.user.userId;
+  try {
+    const userId = req.user.userId;
 
-        const savedPosts = await SavedPost.find({ userId })
-            .populate({
-                path: 'postId',
-                populate: {
-                    path: 'userId',
-                    select: 'username avatar bio'
-                }
-            })
-            .sort({ createdAt: -1 })
-            .lean();
+    const savedPosts = await SavedPost.find({ userId })
+      .populate({
+        path: "postId",
+        populate: {
+          path: "userId",
+          select: "username avatar bio",
+        },
+      })
+      .sort({ createdAt: -1 })
+      .lean();
 
-        // Filter out null posts (in case post was deleted)
-        const posts = savedPosts
-            .map(sp => sp.postId)
-            .filter(post => post !== null);
+    // Filter out null posts (in case post was deleted)
+    const posts = savedPosts
+      .map((sp) => sp.postId)
+      .filter((post) => post !== null);
 
-        // Add interaction data
-        const postsWithDetails = await Promise.all(posts.map(async (post) => {
-            const [likesCount, commentsCount, isLiked, isSaved] = await Promise.all([
-                Like.countDocuments({ postId: post._id }),
-                Comment.countDocuments({ postId: post._id }),
-                Like.exists({ postId: post._id, userId }),
-                SavedPost.exists({ postId: post._id, userId })
-            ]);
+    // Add interaction data
+    const postsWithDetails = await Promise.all(
+      posts.map(async (post) => {
+        const [likesCount, commentsCount, isLiked, isSaved] = await Promise.all(
+          [
+            Like.countDocuments({ postId: post._id }),
+            Comment.countDocuments({ postId: post._id }),
+            Like.exists({ postId: post._id, userId }),
+            SavedPost.exists({ postId: post._id, userId }),
+          ]
+        );
 
-            return {
-                ...post,
-                likesCount,
-                commentsCount,
-                isLiked: !!isLiked,
-                isSaved: !!isSaved
-            };
-        }));
+        return {
+          ...post,
+          likesCount,
+          commentsCount,
+          isLiked: !!isLiked,
+          isSaved: !!isSaved,
+        };
+      })
+    );
 
-        res.json({
-            success: true,
-            message: 'Saved posts retrieved successfully',
-            data: postsWithDetails
-        });
-    } catch (error) {
-        console.error('Get saved posts error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Terjadi kesalahan saat mengambil saved posts'
-        });
-    }
+    res.json({
+      success: true,
+      message: "Saved posts retrieved successfully",
+      data: postsWithDetails,
+    });
+  } catch (error) {
+    console.error("Get saved posts error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Terjadi kesalahan saat mengambil saved posts",
+    });
+  }
 };
 
 // Search users
 exports.searchUsers = async (req, res) => {
-    try {
-        const { q } = req.query;
+  try {
+    const { q } = req.query;
 
-        if (!q || q.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                error: 'Query pencarian tidak boleh kosong'
-            });
-        }
-
-        const users = await User.find({
-            $or: [
-                { username: { $regex: q, $options: 'i' } },
-                { email: { $regex: q, $options: 'i' } }
-            ]
-        })
-        .select('-password')
-        .limit(20)
-        .lean();
-
-        res.json({
-            success: true,
-            message: 'Search completed successfully',
-            data: users
-        });
-    } catch (error) {
-        console.error('Search users error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Terjadi kesalahan saat mencari users'
-        });
+    if (!q || q.trim() === "") {
+      return res.status(400).json({
+        success: false,
+        error: "Query pencarian tidak boleh kosong",
+      });
     }
+
+    const users = await User.find({
+      $or: [
+        { username: { $regex: q, $options: "i" } },
+        { email: { $regex: q, $options: "i" } },
+      ],
+    })
+      .select("-password")
+      .limit(20)
+      .lean();
+
+    res.json({
+      success: true,
+      message: "Search completed successfully",
+      data: users,
+    });
+  } catch (error) {
+    console.error("Search users error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Terjadi kesalahan saat mencari users",
+    });
+  }
 };
 
 // Get suggested users (users not yet chatted with)
@@ -340,36 +347,37 @@ exports.getSuggestedUsers = async (req, res) => {
 
     // Get users that current user has conversations with
     const conversations = await Conversation.find({
-      participants: currentUserId
-    }).populate('participants', '_id');
+      participants: currentUserId,
+    }).populate("participants", "_id");
 
-    const chattedUserIds = conversations.flatMap(conv => 
+    const chattedUserIds = conversations.flatMap((conv) =>
       conv.participants
-        .filter(p => p._id.toString() !== currentUserId.toString())
-        .map(p => p._id)
+        .filter((p) => p._id.toString() !== currentUserId.toString())
+        .map((p) => p._id)
     );
 
     // Get random users excluding current user and chatted users
     const suggestedUsers = await User.find({
-      _id: { 
-        $nin: [...chattedUserIds, currentUserId]
-      }
+      _id: {
+        $nin: [...chattedUserIds, currentUserId],
+      },
     })
-      .select('username avatar bio')
+      .select("username avatar bio")
       .limit(10);
 
     console.log(`✅ Found ${suggestedUsers.length} suggested users`);
 
     res.json({
       success: true,
-      message: 'Suggested users retrieved successfully',
-      data: suggestedUsers
+      message: "Suggested users retrieved successfully",
+      data: suggestedUsers,
     });
   } catch (error) {
-    console.error('❌ Get suggested users error:', error);
+    console.error("❌ Get suggested users error:", error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Terjadi kesalahan saat mengambil suggested users'
+      error:
+        error.message || "Terjadi kesalahan saat mengambil suggested users",
     });
   }
 };
@@ -384,29 +392,31 @@ exports.getFollowers = async (req, res) => {
     const { id } = req.params; // ✅ CHANGED from userId
     const currentUserId = req.user?.userId;
 
-    console.log('📋 Getting followers for user:', id);
+    console.log("📋 Getting followers for user:", id);
 
     // Get followers from Follower collection
     const followers = await Follower.find({ followingId: id }) // ✅ CHANGED
       .populate({
-        path: 'followerId',
-        select: 'username avatar bio'
+        path: "followerId",
+        select: "username avatar bio",
       })
       .sort({ createdAt: -1 })
       .lean();
 
     // Map to get user data
-    const followersList = followers.map(f => f.followerId);
+    const followersList = followers.map((f) => f.followerId);
 
     // If current user is logged in, check if they follow each user
     if (currentUserId) {
       const followingIds = await Follower.find({ followerId: currentUserId })
-        .select('followingId')
+        .select("followingId")
         .lean();
-      
-      const followingSet = new Set(followingIds.map(f => f.followingId.toString()));
 
-      followersList.forEach(user => {
+      const followingSet = new Set(
+        followingIds.map((f) => f.followingId.toString())
+      );
+
+      followersList.forEach((user) => {
         user.isFollowing = followingSet.has(user._id.toString());
       });
     }
@@ -415,14 +425,14 @@ exports.getFollowers = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Followers retrieved successfully',
-      data: followersList
+      message: "Followers retrieved successfully",
+      data: followersList,
     });
   } catch (error) {
-    console.error('❌ Get followers error:', error);
+    console.error("❌ Get followers error:", error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to get followers'
+      error: error.message || "Failed to get followers",
     });
   }
 };
@@ -435,29 +445,33 @@ exports.getFollowing = async (req, res) => {
     const { id } = req.params; // ✅ CHANGED from userId
     const currentUserId = req.user?.userId;
 
-    console.log('📋 Getting following for user:', id);
+    console.log("📋 Getting following for user:", id);
 
     // Get following from Follower collection
     const following = await Follower.find({ followerId: id }) // ✅ CHANGED
       .populate({
-        path: 'followingId',
-        select: 'username avatar bio'
+        path: "followingId",
+        select: "username avatar bio",
       })
       .sort({ createdAt: -1 })
       .lean();
 
     // Map to get user data
-    const followingList = following.map(f => f.followingId);
+    const followingList = following.map((f) => f.followingId);
 
     // If current user is logged in, check if they follow each user
     if (currentUserId) {
-      const userFollowingIds = await Follower.find({ followerId: currentUserId })
-        .select('followingId')
+      const userFollowingIds = await Follower.find({
+        followerId: currentUserId,
+      })
+        .select("followingId")
         .lean();
-      
-      const followingSet = new Set(userFollowingIds.map(f => f.followingId.toString()));
 
-      followingList.forEach(user => {
+      const followingSet = new Set(
+        userFollowingIds.map((f) => f.followingId.toString())
+      );
+
+      followingList.forEach((user) => {
         user.isFollowing = followingSet.has(user._id.toString());
       });
     }
@@ -466,14 +480,14 @@ exports.getFollowing = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Following retrieved successfully',
-      data: followingList
+      message: "Following retrieved successfully",
+      data: followingList,
     });
   } catch (error) {
-    console.error('❌ Get following error:', error);
+    console.error("❌ Get following error:", error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to get following'
+      error: error.message || "Failed to get following",
     });
   }
 };
@@ -486,51 +500,51 @@ exports.getRecommendedUsers = async (req, res) => {
     const currentUserId = req.user.userId;
     const limit = parseInt(req.query.limit) || 5;
 
-    console.log('🔍 Getting recommended users for:', currentUserId);
+    console.log("🔍 Getting recommended users for:", currentUserId);
 
     // Get users that current user is already following
     const following = await Follower.find({ followerId: currentUserId })
-      .select('followingId')
+      .select("followingId")
       .lean();
-    
-    const followingIds = following.map(f => f.followingId.toString());
+
+    const followingIds = following.map((f) => f.followingId.toString());
     followingIds.push(currentUserId); // Exclude self
 
     // Strategy: Find users with most followers that current user doesn't follow
-    const mongoose = require('mongoose');
-    const excludeIds = followingIds.map(id => 
-      typeof id === 'string' ? new mongoose.Types.ObjectId(id) : id
+    const mongoose = require("mongoose");
+    const excludeIds = followingIds.map((id) =>
+      typeof id === "string" ? new mongoose.Types.ObjectId(id) : id
     );
 
     const recommendedUsers = await User.aggregate([
       // Exclude current user and users already followed
       {
         $match: {
-          _id: { $nin: excludeIds }
-        }
+          _id: { $nin: excludeIds },
+        },
       },
       // Lookup followers count
       {
         $lookup: {
-          from: 'followers',
-          localField: '_id',
-          foreignField: 'followingId',
-          as: 'followers'
-        }
+          from: "followers",
+          localField: "_id",
+          foreignField: "followingId",
+          as: "followers",
+        },
       },
       // Add followers count
       {
         $addFields: {
-          followersCount: { $size: '$followers' }
-        }
+          followersCount: { $size: "$followers" },
+        },
       },
       // Sort by followers count (most popular first)
       {
-        $sort: { followersCount: -1 }
+        $sort: { followersCount: -1 },
       },
       // Limit results
       {
-        $limit: limit
+        $limit: limit,
       },
       // Project only needed fields
       {
@@ -539,23 +553,23 @@ exports.getRecommendedUsers = async (req, res) => {
           fullName: 1,
           avatar: 1,
           bio: 1,
-          followersCount: 1
-        }
-      }
+          followersCount: 1,
+        },
+      },
     ]);
 
     console.log(`✅ Found ${recommendedUsers.length} recommended users`);
 
     res.json({
       success: true,
-      message: 'Recommended users retrieved successfully',
-      data: recommendedUsers
+      message: "Recommended users retrieved successfully",
+      data: recommendedUsers,
     });
   } catch (error) {
-    console.error('❌ Get recommended users error:', error);
+    console.error("❌ Get recommended users error:", error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to get recommended users'
+      error: error.message || "Failed to get recommended users",
     });
   }
 };

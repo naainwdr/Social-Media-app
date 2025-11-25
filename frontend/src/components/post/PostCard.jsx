@@ -197,7 +197,13 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
             <p className="font-semibold hover:text-gray-300 transition-colors">
               {post.userId.username}
             </p>
-            <p className="text-xs text-gray-400">{timeAgo}</p>
+            {post.location?.name ? (
+              <p className="text-xs text-gray-400 flex items-center gap-1">
+                📍 {post.location.name}
+              </p>
+            ) : (
+              <p className="text-xs text-gray-400">{timeAgo}</p>
+            )}
           </div>
         </Link>
 
