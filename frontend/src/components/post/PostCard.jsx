@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
+import LikesModal from "./LikesModal";
 
 const API_URL =
   import.meta.env.VITE_API_URL?.replace("/api", "") || "http://localhost:5000";
@@ -33,6 +34,7 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
 
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
+  const [showLikesModal, setShowLikesModal] = useState(false);
 
   // Guard clause
   if (!post.userId || !post.userId._id) {
@@ -347,6 +349,39 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
         </div>
       )}
 
+      {/* Liked by */}
+      {post.likesCount > 0 && (
+        <div className="px-4 pt-3">
+          <button
+            onClick={() => setShowLikesModal(true)}
+            className="text-sm hover:opacity-70 transition-opacity text-left"
+          >
+            {post.firstLikedUser ? (
+              <span>
+                Liked by{" "}
+                <span className="font-semibold">
+                  {post.firstLikedUser.username}
+                </span>
+                {post.likesCount > 1 && (
+                  <span>
+                    {" "}
+                    and{" "}
+                    <span className="font-semibold">
+                      {post.likesCount - 1}{" "}
+                      {post.likesCount === 2 ? "other" : "others"}
+                    </span>
+                  </span>
+                )}
+              </span>
+            ) : (
+              <span className="font-semibold">
+                {post.likesCount} {post.likesCount === 1 ? "like" : "likes"}
+              </span>
+            )}
+          </button>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="post-actions">
         <button
@@ -409,6 +444,13 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
           </button>
         )}
       </div>
+
+      {/* Likes Modal */}
+      <LikesModal
+        isOpen={showLikesModal}
+        onClose={() => setShowLikesModal(false)}
+        postId={post._id}
+      />
     </div>
   );
 };

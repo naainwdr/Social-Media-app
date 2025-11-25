@@ -191,14 +191,17 @@ exports.getAllPosts = async (req, res) => {
 
     const postsWithDetails = await Promise.all(
       validPosts.map(async (post) => {
-        const [likesCount, commentsCount, isLiked, isSaved] = await Promise.all(
-          [
+        const [likesCount, commentsCount, isLiked, isSaved, firstLike] =
+          await Promise.all([
             Like.countDocuments({ postId: post._id }),
             Comment.countDocuments({ postId: post._id }),
             Like.exists({ postId: post._id, userId: currentUserId }),
             SavedPost.exists({ postId: post._id, userId: currentUserId }),
-          ]
-        );
+            Like.findOne({ postId: post._id })
+              .sort({ createdAt: -1 })
+              .populate("userId", "username avatar")
+              .lean(),
+          ]);
 
         return {
           ...post,
@@ -206,6 +209,7 @@ exports.getAllPosts = async (req, res) => {
           commentsCount,
           isLiked: !!isLiked,
           isSaved: !!isSaved,
+          firstLikedUser: firstLike?.userId || null,
         };
       })
     );
@@ -309,14 +313,17 @@ exports.getFeed = async (req, res) => {
 
     const postsWithDetails = await Promise.all(
       validPosts.map(async (post) => {
-        const [likesCount, commentsCount, isLiked, isSaved] = await Promise.all(
-          [
+        const [likesCount, commentsCount, isLiked, isSaved, firstLike] =
+          await Promise.all([
             Like.countDocuments({ postId: post._id }),
             Comment.countDocuments({ postId: post._id }),
             Like.exists({ postId: post._id, userId: currentUserId }),
             SavedPost.exists({ postId: post._id, userId: currentUserId }),
-          ]
-        );
+            Like.findOne({ postId: post._id })
+              .sort({ createdAt: -1 })
+              .populate("userId", "username avatar")
+              .lean(),
+          ]);
 
         return {
           ...post,
@@ -324,6 +331,7 @@ exports.getFeed = async (req, res) => {
           commentsCount,
           isLiked: !!isLiked,
           isSaved: !!isSaved,
+          firstLikedUser: firstLike?.userId || null,
         };
       })
     );
@@ -366,18 +374,24 @@ exports.getPostById = async (req, res) => {
       });
     }
 
-    const [likesCount, commentsCount, isLiked, isSaved] = await Promise.all([
-      Like.countDocuments({ postId: post._id }),
-      Comment.countDocuments({ postId: post._id }),
-      Like.exists({ postId: post._id, userId: currentUserId }),
-      SavedPost.exists({ postId: post._id, userId: currentUserId }),
-    ]);
+    const [likesCount, commentsCount, isLiked, isSaved, firstLike] =
+      await Promise.all([
+        Like.countDocuments({ postId: post._id }),
+        Comment.countDocuments({ postId: post._id }),
+        Like.exists({ postId: post._id, userId: currentUserId }),
+        SavedPost.exists({ postId: post._id, userId: currentUserId }),
+        Like.findOne({ postId: post._id })
+          .sort({ createdAt: -1 })
+          .populate("userId", "username avatar")
+          .lean(),
+      ]);
 
     res.json({
       success: true,
       message: "Post retrieved successfully",
       data: {
         ...post,
+        firstLikedUser: firstLike?.userId || null,
         likesCount,
         commentsCount,
         isLiked: !!isLiked,
@@ -584,6 +598,48 @@ exports.savePost = async (req, res) => {
     });
   } catch (error) {
     console.error("Save post error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Terjadi kesalahan",
+    });
+  }
+};
+
+// Get list of users who liked a post
+exports.getLikes = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const post = await Post.findById(id);
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        error: "Post tidak ditemukan",
+      });
+    }
+
+    // Get all likes with user info
+    const likes = await Like.find({ postId: id })
+      .populate("userId", "username fullName avatar")
+      .sort({ createdAt: -1 });
+
+    const users = likes.map((like) => ({
+      _id: like.userId._id,
+      username: like.userId.username,
+      fullName: like.userId.fullName,
+      avatar: like.userId.avatar,
+      likedAt: like.createdAt,
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        users,
+        total: users.length,
+      },
+    });
+  } catch (error) {
+    console.error("Get likes error:", error);
     res.status(500).json({
       success: false,
       error: "Terjadi kesalahan",

@@ -121,7 +121,7 @@ const ProfilePage = () => {
   };
 
   const handleModalUpdate = () => {
-    if (activeTab === 'posts') {
+    if (activeTab === "posts") {
       refetchProfile();
     } else {
       refetchSaved();
@@ -155,152 +155,152 @@ const ProfilePage = () => {
         <div className="lg:col-span-2">
           {/* Profile Header */}
           <div className="card mb-6">
-        {/* Cover Photo Area */}
-        <div className="h-32 bg-gradient-to-r from-primary-500/20 via-pink-500/20 to-purple-500/20 rounded-t-xl"></div>
-        
-        <div className="px-8 pb-8">
-          {/* Avatar & Actions */}
-          <div className="flex items-end justify-between -mt-16 mb-6">
-            <div className="avatar-ring p-1 bg-gradient-instagram">
-              <div className="avatar w-32 h-32 bg-dark-900 border-4 border-dark-900">
-                {profile?.avatar ? (
-                  <img 
-                    src={getMediaUrl(profile.avatar)} 
-                    alt={profile.username} 
-                    className="w-full h-full object-cover" 
-                  />
-                ) : (
-                  <span className="text-4xl font-bold">
-                    {profile?.username?.charAt(0).toUpperCase()}
-                  </span>
-                )}
-              </div>
-            </div>
+            {/* Cover Photo Area */}
+            <div className="h-32 bg-gradient-to-r from-primary-500/20 via-pink-500/20 to-purple-500/20 rounded-t-xl"></div>
 
-            {/* Action Buttons */}
-            <div className="flex items-center gap-3 mb-4">
-              {isOwnProfile ? (
-                <button
-                  onClick={handleEditProfile}
-                  className="btn btn-secondary flex items-center gap-2 px-6"
-                >
-                  <Settings size={18} />
-                  <span>Edit Profile</span>
-                </button>
-              ) : (
-                <>
-                  <button
-                    onClick={handleFollow}
-                    disabled={followMutation.isPending}
-                    className={`btn flex items-center gap-2 px-6 ${
-                      profile?.isFollowing
-                        ? "btn-secondary"
-                        : "btn-gradient"
-                    }`}
-                  >
-                    {followMutation.isPending ? (
-                      <Loader2 className="animate-spin" size={18} />
-                    ) : profile?.isFollowing ? (
-                      <>
-                        <UserMinus size={18} />
-                        <span>Unfollow</span>
-                      </>
+            <div className="px-8 pb-8">
+              {/* Avatar & Actions */}
+              <div className="flex items-end justify-between -mt-16 mb-6">
+                <div className="avatar-ring p-1 bg-gradient-instagram">
+                  <div className="avatar w-32 h-32 bg-dark-900 border-4 border-dark-900">
+                    {profile?.avatar ? (
+                      <img
+                        src={getMediaUrl(profile.avatar)}
+                        alt={profile.username}
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
-                      <>
-                        <UserPlus size={18} />
-                        <span>Follow</span>
-                      </>
+                      <span className="text-4xl font-bold">
+                        {profile?.username?.charAt(0).toUpperCase()}
+                      </span>
                     )}
-                  </button>
+                  </div>
+                </div>
 
+                {/* Action Buttons */}
+                <div className="flex items-center gap-3 mb-4">
+                  {isOwnProfile ? (
+                    <button
+                      onClick={handleEditProfile}
+                      className="btn btn-secondary flex items-center gap-2 px-6"
+                    >
+                      <Settings size={18} />
+                      <span>Edit Profile</span>
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={handleFollow}
+                        disabled={followMutation.isPending}
+                        className={`btn flex items-center gap-2 px-6 ${
+                          profile?.isFollowing
+                            ? "btn-secondary"
+                            : "btn-gradient"
+                        }`}
+                      >
+                        {followMutation.isPending ? (
+                          <Loader2 className="animate-spin" size={18} />
+                        ) : profile?.isFollowing ? (
+                          <>
+                            <UserMinus size={18} />
+                            <span>Unfollow</span>
+                          </>
+                        ) : (
+                          <>
+                            <UserPlus size={18} />
+                            <span>Follow</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={handleSendMessage}
+                        className="btn btn-secondary flex items-center gap-2 px-6"
+                      >
+                        <MessageCircle size={18} />
+                        <span>Message</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Profile Info */}
+              <div className="space-y-4">
+                {/* Username & Full Name */}
+                <div>
+                  <h1 className="text-2xl font-bold mb-1">
+                    {profile?.username}
+                  </h1>
+                  {profile?.fullName && (
+                    <p className="text-gray-400">{profile.fullName}</p>
+                  )}
+                </div>
+
+                {/* Bio */}
+                {profile?.bio && (
+                  <p className="text-gray-300 leading-relaxed">{profile.bio}</p>
+                )}
+
+                {/* Meta Info */}
+                <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400">
+                  {profile?.location && (
+                    <div className="flex items-center gap-1">
+                      <MapPin size={16} />
+                      <span>{profile.location}</span>
+                    </div>
+                  )}
+                  {profile?.website && (
+                    <a
+                      href={profile.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 hover:text-primary-500 transition-colors"
+                    >
+                      <LinkIcon size={16} />
+                      <span>{profile.website}</span>
+                    </a>
+                  )}
+                  <div className="flex items-center gap-1">
+                    <Calendar size={16} />
+                    <span>Joined {joinedDate}</span>
+                  </div>
+                </div>
+
+                {/* Stats */}
+                <div className="flex gap-8 pt-4 border-t border-dark-800">
+                  <div className="text-center">
+                    <div className="text-xl font-bold">
+                      {profile?.postsCount || 0}
+                    </div>
+                    <div className="text-sm text-gray-400">Posts</div>
+                  </div>
                   <button
-                    onClick={handleSendMessage}
-                    className="btn btn-secondary flex items-center gap-2 px-6"
+                    onClick={handleShowFollowers}
+                    className="text-center hover:opacity-70 transition-opacity"
                   >
-                    <MessageCircle size={18} />
-                    <span>Message</span>
+                    <div className="text-xl font-bold">
+                      {profile?.followersCount || 0}
+                    </div>
+                    <div className="text-sm text-gray-400">Followers</div>
                   </button>
-                </>
-              )}
+                  <button
+                    onClick={handleShowFollowing}
+                    className="text-center hover:opacity-70 transition-opacity"
+                  >
+                    <div className="text-xl font-bold">
+                      {profile?.followingCount || 0}
+                    </div>
+                    <div className="text-sm text-gray-400">Following</div>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Profile Info */}
-          <div className="space-y-4">
-            {/* Username & Full Name */}
-            <div>
-              <h1 className="text-2xl font-bold mb-1">
-                {profile?.username}
-              </h1>
-              {profile?.fullName && (
-                <p className="text-gray-400">{profile.fullName}</p>
-              )}
-            </div>
-
-            {/* Bio */}
-            {profile?.bio && (
-              <p className="text-gray-300 leading-relaxed">{profile.bio}</p>
-            )}
-
-            {/* Meta Info */}
-            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400">
-              {profile?.location && (
-                <div className="flex items-center gap-1">
-                  <MapPin size={16} />
-                  <span>{profile.location}</span>
-                </div>
-              )}
-              {profile?.website && (
-                <a
-                  href={profile.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 hover:text-primary-500 transition-colors"
-                >
-                  <LinkIcon size={16} />
-                  <span>{profile.website}</span>
-                </a>
-              )}
-              <div className="flex items-center gap-1">
-                <Calendar size={16} />
-                <span>Joined {joinedDate}</span>
-              </div>
-            </div>
-
-            {/* Stats */}
-            <div className="flex gap-8 pt-4 border-t border-dark-800">
-              <div className="text-center">
-                <div className="text-xl font-bold">
-                  {profile?.postsCount || 0}
-                </div>
-                <div className="text-sm text-gray-400">Posts</div>
-              </div>
-              <button
-                onClick={handleShowFollowers}
-                className="text-center hover:opacity-70 transition-opacity"
-              >
-                <div className="text-xl font-bold">
-                  {profile?.followersCount || 0}
-                </div>
-                <div className="text-sm text-gray-400">Followers</div>
-              </button>
-              <button
-                onClick={handleShowFollowing}
-                className="text-center hover:opacity-70 transition-opacity"
-              >
-                <div className="text-xl font-bold">
-                  {profile?.followingCount || 0}
-                </div>
-                <div className="text-sm text-gray-400">Following</div>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="card mb-6">
-        <div className="flex justify-center border-b border-dark-800">
+          {/* Tabs */}
+          <div className="card mb-6">
+            <div className="flex justify-center border-b border-dark-800">
               <button
                 onClick={() => setActiveTab("posts")}
                 className={`flex items-center gap-2 px-8 py-4 border-b-2 transition-colors font-semibold ${
@@ -326,44 +326,44 @@ const ProfilePage = () => {
                   <span>SAVED</span>
                 </button>
               )}
-        </div>
-      </div>
-
-      {/* Posts Feed */}
-      {currentLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="animate-spin text-primary-500" size={32} />
-        </div>
-      ) : currentPosts && currentPosts.length > 0 ? (
-        <div className="space-y-6">
-          {currentPosts.map((post) => (
-            <PostCard
-              key={post._id}
-              post={post}
-              onUpdate={handleModalUpdate}
-              onOpenModal={handleOpenModal}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="card p-12 text-center bg-gradient-to-br from-dark-900 to-black border border-dark-800">
-          <div className="w-20 h-20 bg-dark-800 rounded-full flex items-center justify-center mx-auto mb-4">
-            {activeTab === 'posts' ? (
-              <span className="text-4xl">📸</span>
-            ) : (
-              <span className="text-4xl">🔖</span>
-            )}
+            </div>
           </div>
-          <h3 className="text-xl font-semibold mb-2">
-            {activeTab === 'posts' ? 'No posts yet' : 'No saved posts'}
-          </h3>
-          <p className="text-gray-400">
-            {activeTab === 'posts' 
-              ? 'Share your first post to get started' 
-              : 'Posts you save will appear here'}
-          </p>
-        </div>
-      )}
+
+          {/* Posts Feed */}
+          {currentLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="animate-spin text-primary-500" size={32} />
+            </div>
+          ) : currentPosts && currentPosts.length > 0 ? (
+            <div className="space-y-6">
+              {currentPosts.map((post) => (
+                <PostCard
+                  key={post._id}
+                  post={post}
+                  onUpdate={handleModalUpdate}
+                  onOpenModal={handleOpenModal}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="card p-12 text-center bg-gradient-to-br from-dark-900 to-black border border-dark-800">
+              <div className="w-20 h-20 bg-dark-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                {activeTab === "posts" ? (
+                  <span className="text-4xl">📸</span>
+                ) : (
+                  <span className="text-4xl">🔖</span>
+                )}
+              </div>
+              <h3 className="text-xl font-semibold mb-2">
+                {activeTab === "posts" ? "No posts yet" : "No saved posts"}
+              </h3>
+              <p className="text-gray-400">
+                {activeTab === "posts"
+                  ? "Share your first post to get started"
+                  : "Posts you save will appear here"}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Sidebar - Recommended Users */}
