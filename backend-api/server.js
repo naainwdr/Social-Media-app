@@ -1,6 +1,6 @@
 const express = require('express');
-const http = require('http'); // ✅ ADD
-const socketIo = require('socket.io'); // ✅ ADD
+const http = require('http'); // ADD
+const socketIo = require('socket.io'); // ADD
 const dotenv = require('dotenv');
 const cors = require('cors');
 const path = require('path');
@@ -45,15 +45,20 @@ const checkAzureConnection = async () => {
 };
 
 const app = express();
-const server = http.createServer(app); // ✅ CREATE HTTP SERVER
+const server = http.createServer(app); // CREATE HTTP SERVER
 
-// ✅ SETUP SOCKET.IO
+// SETUP SOCKET.IO - Add transports & better config
 const io = socketIo(server, {
     cors: {
         origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
         methods: ['GET', 'POST'],
         credentials: true
-    }
+    },
+    transports: ['websocket', 'polling'], // ADD: Support both transports
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    upgradeTimeout: 30000,
+    allowUpgrades: true
 });
 
 // Middleware
@@ -69,18 +74,35 @@ const logger = require('./src/middleware/logger');
 app.use(logger);
 
 // SOCKET.IO CONNECTION HANDLING
-const onlineUsers = new Map(); // Store userId -> socketId mapping
+const onlineUsers = new Map();
 
 io.on('connection', (socket) => {
     console.log('🔌 New client connected:', socket.id);
+    console.log('🔧 Transport:', socket.conn.transport.name); // Log transport type
 
     // User joins with their userId
     socket.on('join', (userId) => {
+        // Check for duplicate connections
+        const existingSocketId = onlineUsers.get(userId);
+        if (existingSocketId && existingSocketId !== socket.id) {
+            console.log('⚠️ User already connected, replacing old socket:', userId);
+            const oldSocket = io.sockets.sockets.get(existingSocketId);
+            if (oldSocket) {
+                oldSocket.disconnect(true);
+            }
+        }
+
         onlineUsers.set(userId, socket.id);
+        socket.userId = userId; // Store userId in socket
+        
         console.log('👤 User joined:', userId, '| Socket:', socket.id);
         console.log('📊 Online users:', onlineUsers.size);
+        console.log('📋 Online users list:', Array.from(onlineUsers.keys()));
         
-        // Broadcast online status to all clients
+        // Send current online users to joining user
+        socket.emit('online-users', Array.from(onlineUsers.keys()));
+        
+        // Broadcast to ALL (including sender)
         io.emit('user-online', userId);
     });
 
@@ -88,21 +110,49 @@ io.on('connection', (socket) => {
     socket.on('send-message', (messageData) => {
         console.log('📤 Socket message event:', messageData);
         
-        // Send to receiver if online
         const receiverSocketId = onlineUsers.get(messageData.receiverId);
         if (receiverSocketId) {
+            // Send to receiver
             io.to(receiverSocketId).emit('receive-message', messageData);
-            console.log('✅ Message delivered to:', messageData.receiverId);
+            console.log('Message delivered to:', messageData.receiverId);
+            
+            // Confirm to sender
+            socket.emit('message-sent', { messageId: messageData.message._id });
         } else {
             console.log('⚠️ Receiver offline:', messageData.receiverId);
+            socket.emit('receiver-offline', { receiverId: messageData.receiverId });
+        }
+    });
+
+    //  Handle mark as read
+    socket.on('mark-as-read', async ({ messageIds, senderId }) => {
+        try {
+            console.log('📖 Mark as read:', { messageIds, senderId });
+            
+            // Update messages in database
+            await Message.updateMany(
+            { _id: { $in: messageIds } },
+            { isRead: true, readAt: new Date() }
+            );
+            
+            // Notify sender that messages were read
+            const senderSocketId = onlineUsers.get(senderId);
+            if (senderSocketId) {
+            io.to(senderSocketId).emit('messages-read', { messageIds });
+            console.log('✅ Read receipt sent to sender:', senderId);
+            }
+        } catch (error) {
+            console.error('❌ Error marking as read:', error);
         }
     });
 
     // Handle typing indicator
     socket.on('typing', ({ userId, receiverId }) => {
+        console.log('⌨️ Typing event:', userId, '→', receiverId);
         const receiverSocketId = onlineUsers.get(receiverId);
         if (receiverSocketId) {
             io.to(receiverSocketId).emit('user-typing', userId);
+            console.log('Typing indicator sent');
         }
     });
 
@@ -113,12 +163,11 @@ io.on('connection', (socket) => {
         }
     });
 
-    // ✅ HANDLE NOTIFICATION EVENTS
+    // Handle notification
     socket.on('send-notification', async (notificationData) => {
         try {
             console.log('📬 Notification event:', notificationData);
             
-            // Simpan notification ke database
             const notification = new Notification({
                 recipientId: notificationData.recipientId,
                 senderId: notificationData.senderId,
@@ -134,11 +183,10 @@ io.on('connection', (socket) => {
                 { path: 'relatedId', select: 'content image title' } 
             ]);
 
-            // Send to recipient if online
             const recipientSocketId = onlineUsers.get(notificationData.recipientId);
             if (recipientSocketId) {
                 io.to(recipientSocketId).emit('receive-notification', notification);
-                console.log('✅ Notification delivered to:', notificationData.recipientId);
+                console.log('Notification delivered to:', notificationData.recipientId);
             } else {
                 console.log('⚠️ Recipient offline:', notificationData.recipientId);
             }
@@ -148,23 +196,30 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Handle transport upgrade
+    socket.conn.on('upgrade', (transport) => {
+        console.log('🔄 Transport upgraded to:', transport.name);
+    });
+
     // Handle disconnect
-    socket.on('disconnect', () => {
-        // Find and remove user from onlineUsers
-        for (const [userId, socketId] of onlineUsers.entries()) {
-            if (socketId === socket.id) {
-                onlineUsers.delete(userId);
-                io.emit('user-offline', userId);
-                console.log('👋 User disconnected:', userId);
-                console.log('📊 Online users:', onlineUsers.size);
-                break;
-            }
+    socket.on('disconnect', (reason) => {
+        console.log('👋 Client disconnecting:', socket.id, '| Reason:', reason);
+        
+        if (socket.userId) {
+            onlineUsers.delete(socket.userId);
+            io.emit('user-offline', socket.userId);
+            console.log('🔴 User offline:', socket.userId);
+            console.log('📊 Online users:', onlineUsers.size);
         }
     });
 
     // Handle errors
     socket.on('error', (error) => {
         console.error('❌ Socket error:', error);
+    });
+
+    socket.on('connect_error', (error) => {
+        console.error('❌ Connection error:', error);
     });
 });
 

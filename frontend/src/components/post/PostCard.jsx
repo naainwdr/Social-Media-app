@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '../../services/api';
-import toast from 'react-hot-toast';
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import api from "../../services/api";
+import toast from "react-hot-toast";
 import {
   Heart,
   MessageCircle,
@@ -12,16 +12,19 @@ import {
   ChevronLeft,
   ChevronRight,
   Trash2,
-  Edit
-} from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
-import { id as idLocale } from 'date-fns/locale';
+  Edit,
+  MapPin,
+} from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { id as idLocale } from "date-fns/locale";
+import LikesModal from "./LikesModal";
 
-const API_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+const API_URL =
+  import.meta.env.VITE_API_URL?.replace("/api", "") || "http://localhost:5000";
 
 const getMediaUrl = (mediaPath) => {
   if (!mediaPath) return null;
-  if (mediaPath.startsWith('http')) return mediaPath;
+  if (mediaPath.startsWith("http")) return mediaPath;
   return `${API_URL}${mediaPath}`;
 };
 
@@ -32,10 +35,11 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
 
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
+  const [showLikesModal, setShowLikesModal] = useState(false);
 
   // Guard clause
   if (!post.userId || !post.userId._id) {
-    console.warn('⚠️ Post with null user:', post._id);
+    console.warn("⚠️ Post with null user:", post._id);
     return null;
   }
 
@@ -47,14 +51,18 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
   const hasMultipleMedia = allMedia.length > 1;
 
   // Story ring logic
-  const storiesFeed = queryClient.getQueryData(['storiesFeed']);
-  const postUserStoryGroup = storiesFeed?.find(group => group.user._id === post.userId._id);
+  const storiesFeed = queryClient.getQueryData(["storiesFeed"]);
+  const postUserStoryGroup = storiesFeed?.find(
+    (group) => group.user._id === post.userId._id
+  );
   const hasActiveStory = !!postUserStoryGroup;
   const hasUnviewed = postUserStoryGroup?.hasUnviewed || false;
 
   const getStoryRingClass = () => {
-    if (!hasActiveStory) return '';
-    return hasUnviewed ? 'p-0.5 bg-gradient-instagram' : 'p-0.5 border-2 border-dark-700';
+    if (!hasActiveStory) return "";
+    return hasUnviewed
+      ? "p-0.5 bg-gradient-instagram"
+      : "p-0.5 border-2 border-dark-700";
   };
 
   const ringClass = getStoryRingClass();
@@ -66,11 +74,11 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
     }
   };
 
-  // ✅ Force cleanup saat media berubah
+  // Force cleanup saat media berubah
   useEffect(() => {
     // Pause semua video yang masih playing
-    const videos = document.querySelectorAll('video');
-    videos.forEach(video => {
+    const videos = document.querySelectorAll("video");
+    videos.forEach((video) => {
       if (!video.paused) {
         video.pause();
         video.currentTime = 0;
@@ -81,12 +89,16 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
   // Carousel navigation
   const handlePrevMedia = (e) => {
     e.stopPropagation();
-    setCurrentMediaIndex((prev) => (prev === 0 ? allMedia.length - 1 : prev - 1));
+    setCurrentMediaIndex((prev) =>
+      prev === 0 ? allMedia.length - 1 : prev - 1
+    );
   };
 
   const handleNextMedia = (e) => {
     e.stopPropagation();
-    setCurrentMediaIndex((prev) => (prev === allMedia.length - 1 ? 0 : prev + 1));
+    setCurrentMediaIndex((prev) =>
+      prev === allMedia.length - 1 ? 0 : prev + 1
+    );
   };
 
   const isVideo = (url) => {
@@ -99,11 +111,32 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
       const response = await api.post(`/posts/${post._id}/like`);
       return response.data;
     },
+    onMutate: async () => {
+      await queryClient.cancelQueries(['feed']);
+      const previousFeed = queryClient.getQueryData(['feed']);
+      // Optimistic update
+      queryClient.setQueryData(['feed'], (old) => {
+        if (!old) return old;
+        return old.map((p) =>
+          p._id === post._id
+            ? {
+                ...p,
+                isLiked: !p.isLiked,
+                likesCount: p.isLiked ? p.likesCount - 1 : p.likesCount + 1,
+              }
+            : p
+        );
+      });
+      return { previousFeed };
+    },
     onSuccess: () => {
       onUpdate();
     },
-    onError: (error) => {
-      toast.error(error.error || 'Gagal like post');
+    onError: (error, variables, context) => {
+      if (context?.previousFeed) {
+        queryClient.setQueryData(['feed'], context.previousFeed);
+      }
+      toast.error(error.error || "Gagal like post");
     },
   });
 
@@ -112,11 +145,29 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
       const response = await api.post(`/posts/${post._id}/save`);
       return response.data;
     },
+    onMutate: async () => {
+      await queryClient.cancelQueries(['feed']);
+      const previousFeed = queryClient.getQueryData(['feed']);
+      // Optimistic update
+      queryClient.setQueryData(['feed'], (old) => {
+        if (!old) return old;
+        return old.map((p) =>
+          p._id === post._id
+            ? { ...p, isSaved: !p.isSaved }
+            : p
+        );
+      });
+      return { previousFeed };
+    },
     onSuccess: () => {
       onUpdate();
+      queryClient.invalidateQueries(['savedPosts']);
     },
-    onError: (error) => {
-      toast.error(error.error || 'Gagal save post');
+    onError: (error, variables, context) => {
+      if (context?.previousFeed) {
+        queryClient.setQueryData(['feed'], context.previousFeed);
+      }
+      toast.error(error.error || "Gagal save post");
     },
   });
 
@@ -125,11 +176,11 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
       await api.delete(`/posts/${post._id}`);
     },
     onSuccess: () => {
-      toast.success('Post berhasil dihapus');
+      toast.success("Post berhasil dihapus");
       onUpdate();
     },
     onError: (error) => {
-      toast.error(error.error || 'Gagal menghapus post');
+      toast.error(error.error || "Gagal menghapus post");
     },
   });
 
@@ -144,12 +195,12 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
   };
 
   const handleDelete = () => {
-    if (window.confirm('Yakin ingin menghapus post ini?')) {
+    if (window.confirm("Yakin ingin menghapus post ini?")) {
       deleteMutation.mutate();
     }
   };
 
-  // ✅ Handler untuk open modal - hanya dari button comment
+  // Handler untuk open modal - hanya dari button comment
   const handleOpenComments = (e) => {
     e.stopPropagation();
     if (onOpenModal) {
@@ -180,9 +231,10 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
 
   // Truncate content for preview
   const MAX_LENGTH = 100;
-  const displayContent = post.content.length > MAX_LENGTH
-    ? post.content.slice(0, MAX_LENGTH) + '...'
-    : post.content;
+  const displayContent =
+    post.content.length > MAX_LENGTH
+      ? post.content.slice(0, MAX_LENGTH) + "..."
+      : post.content;
 
   return (
     <div className="post-card">
@@ -211,7 +263,8 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
             </p>
             {post.location?.name ? (
               <p className="text-xs text-gray-400 flex items-center gap-1">
-                📍 {post.location.name}
+                <MapPin size={14} className="inline-block mr-1" />
+                {post.location.name}
               </p>
             ) : (
               <p className="text-xs text-gray-400">{timeAgo}</p>
@@ -243,7 +296,7 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
                   <button
                     onClick={() => {
                       setShowMenu(false);
-                      onOpenModal && onOpenModal(post._id, 'edit');
+                      onOpenModal && onOpenModal(post._id, "edit");
                     }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-blue-500 hover:bg-dark-800 rounded-lg transition-colors"
                   >
@@ -272,7 +325,9 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
             {isVideo(allMedia[currentMediaIndex]) ? (
               <video
                 key={`video-${post._id}-${currentMediaIndex}`}
-                src={`${getMediaUrl(allMedia[currentMediaIndex])}?t=${Date.now()}`}
+                src={`${getMediaUrl(
+                  allMedia[currentMediaIndex]
+                )}?t=${Date.now()}`}
                 controls
                 playsInline
                 preload="metadata"
@@ -319,8 +374,8 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
                     }}
                     className={`transition-all ${
                       index === currentMediaIndex
-                        ? 'w-2 h-2 bg-primary-500'
-                        : 'w-1.5 h-1.5 bg-white/50 hover:bg-white/70'
+                        ? "w-2 h-2 bg-primary-500"
+                        : "w-1.5 h-1.5 bg-white/50 hover:bg-white/70"
                     } rounded-full`}
                   />
                 ))}
@@ -335,26 +390,56 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
         </div>
       )}
 
+      {/* Liked by */}
+      {post.likesCount > 0 && (
+        <div className="px-4 pt-3">
+          <button
+            onClick={() => setShowLikesModal(true)}
+            className="text-sm hover:opacity-70 transition-opacity text-left"
+          >
+            {post.firstLikedUser ? (
+              <span>
+                Liked by{" "}
+                <span className="font-semibold">
+                  {post.firstLikedUser.username}
+                </span>
+                {post.likesCount > 1 && (
+                  <span>
+                    {" "}
+                    and{" "}
+                    <span className="font-semibold">
+                      {post.likesCount - 1}{" "}
+                      {post.likesCount === 2 ? "other" : "others"}
+                    </span>
+                  </span>
+                )}
+              </span>
+            ) : (
+              <span className="font-semibold">
+                {post.likesCount} {post.likesCount === 1 ? "like" : "likes"}
+              </span>
+            )}
+          </button>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="post-actions">
         <button
           onClick={handleLike}
           disabled={likeMutation.isPending}
-          className={`post-action-btn ${post.isLiked ? 'text-red-500' : ''}`}
+          className={`post-action-btn ${post.isLiked ? "text-red-500" : ""}`}
         >
           <Heart
             size={24}
-            fill={post.isLiked ? 'currentColor' : 'none'}
+            fill={post.isLiked ? "currentColor" : "none"}
             className="transition-all"
           />
           {post.likesCount > 0 && <span>{post.likesCount}</span>}
         </button>
 
         {/* ✅ Comment button - triggers modal */}
-        <button
-          onClick={handleOpenComments}
-          className="post-action-btn"
-        >
+        <button onClick={handleOpenComments} className="post-action-btn">
           <MessageCircle size={24} />
           {post.commentsCount > 0 && <span>{post.commentsCount}</span>}
         </button>
@@ -362,11 +447,13 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
         <button
           onClick={handleSave}
           disabled={saveMutation.isPending}
-          className={`post-action-btn ml-auto ${post.isSaved ? 'text-yellow-500' : ''}`}
+          className={`post-action-btn ml-auto ${
+            post.isSaved ? "text-yellow-500" : ""
+          }`}
         >
           <Bookmark
             size={24}
-            fill={post.isSaved ? 'currentColor' : 'none'}
+            fill={post.isSaved ? "currentColor" : "none"}
             className="transition-all"
           />
         </button>
@@ -381,7 +468,7 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
             onClick={(e) => e.stopPropagation()}
           >
             {post.userId.username}
-          </Link>{' '}
+          </Link>{" "}
           <span className="text-gray-300">{displayContent}</span>
           {post.content.length > MAX_LENGTH && (
             <span className="text-gray-400"> ...selengkapnya</span>
@@ -398,6 +485,13 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
           </button>
         )}
       </div>
+
+      {/* Likes Modal */}
+      <LikesModal
+        isOpen={showLikesModal}
+        onClose={() => setShowLikesModal(false)}
+        postId={post._id}
+      />
     </div>
   );
 };

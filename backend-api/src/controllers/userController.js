@@ -1,12 +1,12 @@
-const User = require('../models/User');
-const Follower = require('../models/Follower');
-const Post = require('../models/Post');
-const SavedPost = require('../models/SavedPost');
-const Like = require('../models/Like');
-const Comment = require('../models/Comment');
-const Conversation = require('../models/Conversation');
-const Notification = require('../models/Notification');
-const { createNotification } = require('../controllers/notificationController');
+const User = require("../models/User");
+const Follower = require("../models/Follower");
+const Post = require("../models/Post");
+const SavedPost = require("../models/SavedPost");
+const Like = require("../models/Like");
+const Comment = require("../models/Comment");
+const Conversation = require("../models/Conversation");
+const Notification = require("../models/Notification");
+const { createNotification } = require("../controllers/notificationController");
 
 // Get current user
 exports.getCurrentUser = async (req, res) => {
@@ -195,98 +195,98 @@ exports.followUser = async (req, res) => {
     const { id } = req.params;
     const currentUserId = req.user.userId;
 
-        // Check if user exists
-        const userToFollow = await User.findById(id);
-        if (!userToFollow) {
-            return res.status(404).json({
-                success: false,
-                error: 'User tidak ditemukan'
-            });
-        }
-
-        // Can't follow yourself
-        if (id === currentUserId) {
-            return res.status(400).json({
-                success: false,
-                error: 'Anda tidak bisa follow diri sendiri'
-            });
-        }
-
-        // Check if already following
-        const existingFollow = await Follower.findOne({
-            followerId: currentUserId,
-            followingId: id
-        });
-
-        if (existingFollow) {
-            // Unfollow
-            await Follower.findByIdAndDelete(existingFollow._id);
-            
-            return res.json({
-                success: true,
-                message: 'Berhasil unfollow user',
-                isFollowing: false
-            });
-        } else {
-            // Follow
-            await Follower.create({
-                followerId: currentUserId,
-                followingId: id
-            });
-            
-            // Trigger notification
-            try {
-                console.log('\n🔵 NOTIF DEBUG - Follow detected');
-                console.log('   Following user ID:', id);
-                console.log('   Follower ID:', currentUserId);
-
-                const notification = new Notification({
-                    recipientId: id,
-                    senderId: currentUserId,
-                    type: 'follow',
-                    content: `${userToFollow.username} mulai mengikuti Anda`,
-                    relatedId: currentUserId,
-                    relatedType: 'User'
-                });
-                
-                console.log('   Saving to DB...');
-                await notification.save();
-                console.log('   ✅ Saved:', notification._id);
-
-                await notification.populate('senderId', 'username avatar');
-
-                // Emit via Socket.IO
-                const io = req.app.get('io');
-                const onlineUsers = req.app.get('onlineUsers');
-                const recipientSocketId = onlineUsers.get(id);
-                
-                console.log('   Socket emit:');
-                console.log('   - Recipient ID:', id);
-                console.log('   - Socket ID:', recipientSocketId || 'NOT_ONLINE');
-
-                if (recipientSocketId) {
-                    io.to(recipientSocketId).emit('receive-notification', notification);
-                    console.log('   ✅ Socket emitted successfully\n');
-                } else {
-                    console.log('   ⚠️  Recipient not online\n');
-                }
-            } catch (notifError) {
-                console.error('❌ Error creating notification:', notifError);
-            }
-            
-            return res.json({
-                success: true,
-                message: 'Berhasil follow user',
-                isFollowing: true
-            });
-        }
-    } catch (error) {
-        console.error('Follow user error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Terjadi kesalahan saat follow/unfollow user'
-        });
+    // Check if user exists
+    const userToFollow = await User.findById(id);
+    if (!userToFollow) {
+      return res.status(404).json({
+        success: false,
+        error: "User tidak ditemukan",
+      });
     }
+
+    // Can't follow yourself
+    if (id === currentUserId) {
+      return res.status(400).json({
+        success: false,
+        error: "Anda tidak bisa follow diri sendiri",
+      });
+    }
+
+    // Check if already following
+    const existingFollow = await Follower.findOne({
+      followerId: currentUserId,
+      followingId: id,
+    });
+
+    if (existingFollow) {
+      // Unfollow
+      await Follower.findByIdAndDelete(existingFollow._id);
+
+      return res.json({
+        success: true,
+        message: "Berhasil unfollow user",
+        isFollowing: false,
+      });
+    } else {
+      // Follow
+      await Follower.create({
+        followerId: currentUserId,
+        followingId: id,
+      });
+
+      // Trigger notification
+      try {
+        console.log("\n🔵 NOTIF DEBUG - Follow detected");
+        console.log("   Following user ID:", id);
+        console.log("   Follower ID:", currentUserId);
+
+        const notification = new Notification({
+          recipientId: id,
+          senderId: currentUserId,
+          type: "follow",
+          content: `${userToFollow.username} mulai mengikuti Anda`,
+          relatedId: currentUserId,
+          relatedType: "User",
+        });
+
+        console.log("   Saving to DB...");
+        await notification.save();
+        console.log("   ✅ Saved:", notification._id);
+
+        await notification.populate("senderId", "username avatar");
+
+        // Emit via Socket.IO
+        const io = req.app.get("io");
+        const onlineUsers = req.app.get("onlineUsers");
+        const recipientSocketId = onlineUsers.get(id);
+
+        console.log("   Socket emit:");
+        console.log("   - Recipient ID:", id);
+        console.log("   - Socket ID:", recipientSocketId || "NOT_ONLINE");
+
+        if (recipientSocketId) {
+          io.to(recipientSocketId).emit("receive-notification", notification);
+          console.log("   ✅ Socket emitted successfully\n");
+        } else {
+          console.log("   ⚠️  Recipient not online\n");
+        }
+      } catch (notifError) {
+        console.error("❌ Error creating notification:", notifError);
+      }
+
+      return res.json({
+        success: true,
+        message: "Berhasil follow user",
+        isFollowing: true,
+      });
+    }
+  } catch (error) {
+    console.error("Follow user error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Terjadi kesalahan saat follow/unfollow user",
+    });
+  }
 };
 
 // Get saved posts
@@ -297,18 +297,24 @@ exports.getSavedPosts = async (req, res) => {
     const savedPosts = await SavedPost.find({ userId })
       .populate({
         path: "postId",
+        // Pastikan field createdAt Post diambil
         populate: {
           path: "userId",
           select: "username avatar bio",
         },
       })
-      .sort({ createdAt: -1 })
+      // Biarkan sort berdasarkan savedAt (terbaru) untuk memastikan stabilitas urutan awal Mongoose
+      .sort({ savedAt: -1 }) 
       .lean();
 
     // Filter out null posts (in case post was deleted)
     const posts = savedPosts
       .map((sp) => sp.postId)
       .filter((post) => post !== null);
+
+    // Sort posts berdasarkan Post.createdAt (Terbaru ke Terlama).
+    // Ini akan menimpa urutan SavedAt di JavaScript.
+    posts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     // Add interaction data
     const postsWithDetails = await Promise.all(
