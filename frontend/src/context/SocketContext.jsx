@@ -45,6 +45,11 @@ export const SocketProvider = ({ children }) => {
         });
       });
 
+      // Listen untuk notification dari backend
+      newSocket.on('receive-notification', (notification) => {
+        console.log('🔔 Socket notification received:', notification);
+      });
+
       newSocket.on('disconnect', () => {
         console.log('❌ Disconnected from socket server');
       });

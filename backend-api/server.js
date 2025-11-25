@@ -6,6 +6,7 @@ const cors = require('cors');
 const path = require('path');
 const connectDB = require('./src/config/db');
 const { BlobServiceClient } = require('@azure/storage-blob');
+const Notification = require('./src/models/Notification');
 
 // Load environment variables
 dotenv.config();
@@ -112,6 +113,41 @@ io.on('connection', (socket) => {
         }
     });
 
+    // ✅ HANDLE NOTIFICATION EVENTS
+    socket.on('send-notification', async (notificationData) => {
+        try {
+            console.log('📬 Notification event:', notificationData);
+            
+            // Simpan notification ke database
+            const notification = new Notification({
+                recipientId: notificationData.recipientId,
+                senderId: notificationData.senderId,
+                type: notificationData.type,
+                content: notificationData.content,
+                relatedId: notificationData.relatedId,
+                relatedType: notificationData.relatedType
+            });
+            
+            await notification.save();
+            await notification.populate([
+                { path: 'senderId', select: 'username avatar' },
+                { path: 'relatedId', select: 'content image title' } 
+            ]);
+
+            // Send to recipient if online
+            const recipientSocketId = onlineUsers.get(notificationData.recipientId);
+            if (recipientSocketId) {
+                io.to(recipientSocketId).emit('receive-notification', notification);
+                console.log('✅ Notification delivered to:', notificationData.recipientId);
+            } else {
+                console.log('⚠️ Recipient offline:', notificationData.recipientId);
+            }
+        } catch (error) {
+            console.error('❌ Error sending notification:', error);
+            socket.emit('notification-error', { error: error.message });
+        }
+    });
+
     // Handle disconnect
     socket.on('disconnect', () => {
         // Find and remove user from onlineUsers
@@ -144,6 +180,7 @@ app.use('/api/comments', require('./src/routes/commentRoutes'));
 app.use('/api/analytics', require('./src/routes/analyticsRoutes'));
 app.use('/api/messages', require('./src/routes/messageRoutes'));
 app.use('/api/stories', require('./src/routes/storyRoutes'));
+app.use('/api/notifications', require('./src/routes/notificationRoutes'));
 
 // Root route
 app.get('/', (req, res) => {
@@ -157,7 +194,8 @@ app.get('/', (req, res) => {
             comments: '/api/comments',
             analytics: '/api/analytics',
             messages: '/api/messages', 
-            stories: '/api/stories'
+            stories: '/api/stories',
+            notifications: '/api/notifications'
         },
         socket: {
             connected: io.engine.clientsCount,

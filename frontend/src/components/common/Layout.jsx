@@ -1,6 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Home, Search, PlusSquare, MessageCircle, User, LogOut, BarChart3 } from 'lucide-react';
+import { Home, Search, PlusSquare, MessageCircle, User, LogOut, Flame, TrendingUp } from 'lucide-react';
+import { NotificationBell } from '../notification/NotificationBell';
 
 const Layout = () => {
   const { user, logout } = useAuth();
@@ -8,16 +9,15 @@ const Layout = () => {
 
   const navItems = [
     { path: '/', icon: Home, label: 'Home' },
-    { path: '/explore', icon: Search, label: 'Explore' },
+    { path: '/search', icon: Search, label: 'Search' },
+    { path: '/explore', icon: TrendingUp, label: 'Explore' },
     { path: '/create', icon: PlusSquare, label: 'Create' },
     { path: '/messages', icon: MessageCircle, label: 'Messages' },
-    { path: '/analytics', icon: BarChart3, label: 'Analytics' },
+    { path: '/discover', icon: Flame, label: 'Discover' },
     { path: `/profile/${user?._id}`, icon: User, label: 'Profile' },
   ];
 
   const isActive = (path) => location.pathname === path;
-  
-  // ✅ Check if current page is Messages
   const isMessagesPage = location.pathname.startsWith('/messages');
 
   return (
@@ -50,9 +50,16 @@ const Layout = () => {
             ))}
           </nav>
 
-          {/* User Info */}
-          <div className="border-t border-dark-800 pt-4 mt-4">
-            <div className="flex items-center gap-3 px-3 mb-3">
+          {/* User Info & Notifications */}
+          <div className="border-t border-dark-800 pt-4 mt-4 space-y-3">
+            {/* Notification Bell */}
+            <div className="flex items-center justify-between px-3">
+              <span className="text-sm text-gray-400">Notifikasi</span>
+              <NotificationBell />
+            </div>
+
+            {/* User Info */}
+            <div className="flex items-center gap-3 px-3">
               <div className="avatar w-10 h-10 bg-gradient-instagram">
                 {user?.avatar ? (
                   <img src={user.avatar} alt={user.username} />
@@ -89,7 +96,7 @@ const Layout = () => {
       {/* Bottom Navigation - Mobile */}
       <nav className="navbar lg:hidden fixed bottom-0 left-0 right-0 bg-black border-t border-dark-800 z-50">
         <div className="flex justify-around items-center h-16 max-w-lg mx-auto">
-          {navItems.map((item) => (
+          {navItems.slice(0, 5).map((item) => (
             <Link
               key={item.path}
               to={item.path}
@@ -102,12 +109,20 @@ const Layout = () => {
               <item.icon size={24} />
             </Link>
           ))}
-          <button
-            onClick={logout}
-            className="flex items-center justify-center w-12 h-12 rounded-lg text-gray-400 hover:text-white transition-colors"
+          {/* Notification Bell - Mobile */}
+          <div className="flex items-center justify-center w-12 h-12 rounded-lg">
+            <NotificationBell />
+          </div>
+          <Link
+            to={`/profile/${user?._id}`}
+            className={`flex items-center justify-center w-12 h-12 rounded-lg transition-colors ${
+              isActive(`/profile/${user?._id}`)
+                ? 'text-white'
+                : 'text-gray-400 hover:text-white'
+            }`}
           >
-            <LogOut size={24} />
-          </button>
+            <User size={24} />
+          </Link>
         </div>
       </nav>
     </div>

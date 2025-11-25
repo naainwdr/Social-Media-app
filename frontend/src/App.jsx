@@ -2,17 +2,19 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
-import { SocketProvider } from './context/SocketContext'; // ✅ ADD
+import { SocketProvider } from './context/SocketContext';
+import { NotificationProvider } from './context/NotificationContext';
 
 // Pages
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import HomePage from './pages/HomePage';
+import SearchPage from './pages/SearchPage'; 
 import ExplorePage from './pages/ExplorePage';
 import ProfilePage from './pages/ProfilePage';
 import NotFoundPage from './pages/NotFoundPage';
 import CreatePage from './pages/CreatePage';
-import AnalyticsPage from './pages/AnalyticsPage';
+import DiscoverPage from './pages/DiscoverPage';
 import MessagesPage from './pages/MessagesPage';
 import StoryViewerPage from './pages/StoryViewerPage';
 
@@ -36,7 +38,8 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <Router>
         <AuthProvider>
-          <SocketProvider> {/* ✅ ADD */}
+          <SocketProvider>
+            <NotificationProvider>
             <Routes>
               {/* Public routes */}
               <Route path="/login" element={<LoginPage />} />
@@ -46,9 +49,10 @@ function App() {
               <Route element={<ProtectedRoute />}>
                 <Route element={<Layout />}>
                   <Route path="/" element={<HomePage />} />
+                  <Route path="/search" element={<SearchPage />} /> {/* ✅ New */}
                   <Route path="/explore" element={<ExplorePage />} />
                   <Route path="/create" element={<CreatePage />} />
-                  <Route path="/analytics" element={<AnalyticsPage />} />
+                  <Route path="/discover" element={<DiscoverPage />} />
                   <Route path="/messages" element={<MessagesPage />} />
                   <Route path="/messages/:userId" element={<MessagesPage />} />
                   <Route path="/profile/:userId" element={<ProfilePage />} />
@@ -81,12 +85,14 @@ function App() {
                   },
                 },
               }}
-            />
-          </SocketProvider> {/* ✅ ADD */}
+              />
+              </NotificationProvider>
+          </SocketProvider>
         </AuthProvider>
       </Router>
     </QueryClientProvider>
   );
 }
+
 
 export default App;
