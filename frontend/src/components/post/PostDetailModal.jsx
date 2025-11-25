@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import { X, Loader2, Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Loader2, Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Trash2, ChevronLeft, ChevronRight, Edit, Check } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
@@ -23,8 +23,11 @@ const PostDetailModal = ({ postId, onClose, onUpdate }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [showFullContent, setShowFullContent] = useState(false);
   const [newComment, setNewComment] = useState('');
-  
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+  
+  // ✅ Edit mode states
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editedCaption, setEditedCaption] = useState('');
 
   const { data: post, isLoading } = useQuery({
     queryKey: ['post', postId],
@@ -33,6 +36,10 @@ const PostDetailModal = ({ postId, onClose, onUpdate }) => {
       return response.data.data;
     },
     enabled: !!postId,
+    onSuccess: (data) => {
+      // Set initial caption when post loads
+      setEditedCaption(data.content);
+    },
   });
 
   const { data: comments } = useQuery({
@@ -44,12 +51,7 @@ const PostDetailModal = ({ postId, onClose, onUpdate }) => {
     enabled: !!postId,
   });
 
-  const allMedia = post?.images && post.images.length > 0 
-    ? post.images 
-    : post?.image 
-    ? [post.image] 
-    : [];
-
+  const allMedia = post?.media || [];
   const hasMultipleMedia = allMedia.length > 1;
 
   const handlePrevMedia = (e) => {
@@ -66,22 +68,60 @@ const PostDetailModal = ({ postId, onClose, onUpdate }) => {
     return url.toLowerCase().match(/\.(mp4|mov|avi|webm)$/);
   };
 
-  // Optimized: Create comment dengan optimistic update
+  // ✅ Update post mutation
+  const updatePostMutation = useMutation({
+    mutationFn: async (data) => {
+      const response = await api.put(`/posts/${postId}`, data);
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Post updated successfully');
+      setIsEditMode(false);
+      queryClient.invalidateQueries(['post', postId]);
+      queryClient.invalidateQueries(['explorePosts'], { refetchType: 'none' });
+      queryClient.invalidateQueries(['feed'], { refetchType: 'none' });
+      onUpdate?.();
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || 'Failed to update post');
+    },
+  });
+
+  // ✅ Handle edit save
+  const handleSaveEdit = () => {
+    if (!editedCaption.trim()) {
+      toast.error('Caption cannot be empty');
+      return;
+    }
+
+    if (editedCaption.trim() === post.content) {
+      // No changes made
+      setIsEditMode(false);
+      return;
+    }
+
+    updatePostMutation.mutate({ content: editedCaption.trim() });
+  };
+
+  // ✅ Handle edit cancel
+  const handleCancelEdit = () => {
+    setEditedCaption(post.content); // Reset to original
+    setIsEditMode(false);
+  };
+
+  // Optimized: Create comment
   const createCommentMutation = useMutation({
     mutationFn: async (data) => {
       const response = await api.post(`/comments/post/${postId}`, data);
       return response.data;
     },
     onMutate: async (newCommentData) => {
-      // Cancel outgoing refetches
       await queryClient.cancelQueries(['comments', postId]);
       await queryClient.cancelQueries(['post', postId]);
 
-      // Snapshot previous values
       const previousComments = queryClient.getQueryData(['comments', postId]);
       const previousPost = queryClient.getQueryData(['post', postId]);
 
-      // Optimistically update comments
       const optimisticComment = {
         _id: 'temp-' + Date.now(),
         content: newCommentData.content,
@@ -96,7 +136,6 @@ const PostDetailModal = ({ postId, onClose, onUpdate }) => {
         old ? [...old, optimisticComment] : [optimisticComment]
       );
 
-      // Optimistically update post comment count
       queryClient.setQueryData(['post', postId], (old) => 
         old ? { ...old, commentsCount: (old.commentsCount || 0) + 1 } : old
       );
@@ -106,18 +145,12 @@ const PostDetailModal = ({ postId, onClose, onUpdate }) => {
     onSuccess: () => {
       toast.success('Comment posted');
       setNewComment('');
-      
-      // ✅ Refetch only necessary queries
       queryClient.invalidateQueries(['comments', postId]);
       queryClient.invalidateQueries(['post', postId]);
-      
-      // Update explorer in background (no await)
       queryClient.invalidateQueries(['explorePosts'], { refetchType: 'none' });
-      
       onUpdate?.();
     },
     onError: (error, variables, context) => {
-      // Rollback on error
       if (context?.previousComments) {
         queryClient.setQueryData(['comments', postId], context.previousComments);
       }
@@ -128,7 +161,7 @@ const PostDetailModal = ({ postId, onClose, onUpdate }) => {
     },
   });
 
-  // ✅ Optimized: Like dengan optimistic update
+  // Like mutation
   const likeMutation = useMutation({
     mutationFn: async () => {
       const response = await api.post(`/posts/${postId}/like`);
@@ -136,10 +169,8 @@ const PostDetailModal = ({ postId, onClose, onUpdate }) => {
     },
     onMutate: async () => {
       await queryClient.cancelQueries(['post', postId]);
-      
       const previousPost = queryClient.getQueryData(['post', postId]);
       
-      // Optimistically update
       queryClient.setQueryData(['post', postId], (old) => {
         if (!old) return old;
         return {
@@ -152,7 +183,6 @@ const PostDetailModal = ({ postId, onClose, onUpdate }) => {
       return { previousPost };
     },
     onSuccess: () => {
-      // Update explorer data in background
       queryClient.invalidateQueries(['explorePosts'], { refetchType: 'none' });
       queryClient.invalidateQueries(['posts'], { refetchType: 'none' });
       onUpdate?.();
@@ -165,7 +195,7 @@ const PostDetailModal = ({ postId, onClose, onUpdate }) => {
     },
   });
 
-  // ✅ Optimized: Save mutation
+  // Save mutation
   const saveMutation = useMutation({
     mutationFn: async () => {
       const response = await api.post(`/posts/${postId}/save`);
@@ -173,7 +203,6 @@ const PostDetailModal = ({ postId, onClose, onUpdate }) => {
     },
     onMutate: async () => {
       await queryClient.cancelQueries(['post', postId]);
-      
       const previousPost = queryClient.getQueryData(['post', postId]);
       
       queryClient.setQueryData(['post', postId], (old) => {
@@ -195,7 +224,7 @@ const PostDetailModal = ({ postId, onClose, onUpdate }) => {
     },
   });
 
-  // Delete mutation (no optimization needed)
+  // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async () => {
       await api.delete(`/posts/${postId}`);
@@ -205,6 +234,7 @@ const PostDetailModal = ({ postId, onClose, onUpdate }) => {
       onClose();
       queryClient.invalidateQueries(['explorePosts']);
       queryClient.invalidateQueries(['posts']);
+      queryClient.invalidateQueries(['feed']);
       onUpdate?.();
     },
     onError: (error) => {
@@ -226,7 +256,6 @@ const PostDetailModal = ({ postId, onClose, onUpdate }) => {
     });
   };
 
-  // ✅ Handler untuk child component updates (like comment, delete comment, dll)
   const handleChildUpdate = () => {
     queryClient.invalidateQueries(['comments', postId]);
     queryClient.invalidateQueries(['post', postId]);
@@ -451,6 +480,20 @@ const PostDetailModal = ({ postId, onClose, onUpdate }) => {
                           onClick={() => setShowMenu(false)}
                         />
                         <div className="absolute right-0 mt-2 w-44 bg-dark-800 rounded-lg p-1.5 space-y-1 z-20 shadow-xl border border-dark-700">
+                          {/* ✅ Edit Button */}
+                          <button
+                            onClick={() => {
+                              setShowMenu(false);
+                              setIsEditMode(true);
+                              setEditedCaption(post.content);
+                            }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-blue-500 hover:bg-dark-700 rounded-lg transition-colors"
+                          >
+                            <Edit size={16} />
+                            <span>Edit</span>
+                          </button>
+
+                          {/* Delete Button */}
                           <button
                             onClick={handleDelete}
                             disabled={deleteMutation.isPending}
@@ -470,27 +513,76 @@ const PostDetailModal = ({ postId, onClose, onUpdate }) => {
                 )}
               </div>
 
-              {/* Caption */}
+              {/* Caption - Editable or Display */}
               {post.content && (
                 <div className="px-4 py-3 border-b border-dark-800">
-                  <p className="text-sm break-words">
-                    <Link
-                      to={`/profile/${post.userId._id}`}
-                      className="font-semibold hover:text-gray-300 transition-colors"
-                    >
-                      {post.userId.username}
-                    </Link>{' '}
-                    <span className="text-gray-300">{displayContent}</span>
-                    {isLongContent && (
-                      <button
-                        onClick={() => setShowFullContent(!showFullContent)}
-                        className="text-sm text-gray-400 hover:text-white font-semibold ml-1"
-                      >
-                        {showFullContent ? 'less' : 'more'}
-                      </button>
-                    )}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-2">{timeAgo}</p>
+                  {isEditMode ? (
+                    // ✅ Edit Mode
+                    <div className="space-y-3">
+                      <textarea
+                        value={editedCaption}
+                        onChange={(e) => setEditedCaption(e.target.value)}
+                        className="w-full bg-dark-800 border border-dark-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary-500 resize-none"
+                        rows={4}
+                        maxLength={2200}
+                        placeholder="Write a caption..."
+                      />
+                      
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">
+                          {editedCaption.length}/2200
+                        </span>
+                        
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleCancelEdit}
+                            className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleSaveEdit}
+                            disabled={updatePostMutation.isPending || !editedCaption.trim()}
+                            className="px-3 py-1.5 text-sm bg-primary-500 hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold transition-colors flex items-center gap-1"
+                          >
+                            {updatePostMutation.isPending ? (
+                              <>
+                                <Loader2 size={14} className="animate-spin" />
+                                <span>Saving...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Check size={14} />
+                                <span>Save</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    // ✅ Display Mode
+                    <>
+                      <p className="text-sm break-words">
+                        <Link
+                          to={`/profile/${post.userId._id}`}
+                          className="font-semibold hover:text-gray-300 transition-colors"
+                        >
+                          {post.userId.username}
+                        </Link>{' '}
+                        <span className="text-gray-300">{displayContent}</span>
+                        {isLongContent && (
+                          <button
+                            onClick={() => setShowFullContent(!showFullContent)}
+                            className="text-sm text-gray-400 hover:text-white font-semibold ml-1"
+                          >
+                            {showFullContent ? 'less' : 'more'}
+                          </button>
+                        )}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-2">{timeAgo}</p>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -575,11 +667,11 @@ const PostDetailModal = ({ postId, onClose, onUpdate }) => {
                     onChange={(e) => setNewComment(e.target.value)}
                     placeholder="Add a comment..."
                     className="flex-1 bg-transparent text-sm py-2 focus:outline-none"
-                    disabled={createCommentMutation.isPending}
+                    disabled={createCommentMutation.isPending || isEditMode}
                   />
                   <button
                     type="submit"
-                    disabled={createCommentMutation.isPending || !newComment.trim()}
+                    disabled={createCommentMutation.isPending || !newComment.trim() || isEditMode}
                     className="text-primary-500 font-semibold text-sm disabled:opacity-50 hover:text-primary-400 transition-colors"
                   >
                     {createCommentMutation.isPending ? (

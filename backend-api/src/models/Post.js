@@ -13,21 +13,17 @@ const PostSchema = new Schema({
         required: [true, 'Content wajib diisi'],
         maxlength: [2200, 'Postingan tidak boleh lebih dari 2200 karakter']
     },
-    images: [{
+    media: [{
         type: String,
         required: false
     }],
-    image: {
-        type: String,
-        default: ''
-    },
     createdAt: {
         type: Date,
         default: Date.now
     }
 });
 
-// Virtuals untuk like count dan comment count
+// Virtuals
 PostSchema.virtual('likesCount', {
     ref: 'Like',
     localField: '_id',

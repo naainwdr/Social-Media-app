@@ -18,6 +18,9 @@ router.get('/saved', protect, userController.getSavedPosts);
 // Get suggested users for messaging
 router.get('/suggestions', protect, userController.getSuggestedUsers);
 
+// Get recommended users to follow
+router.get('/recommended', protect, userController.getRecommendedUsers);
+
 // Update profile with Azure upload (field name: 'avatar')
 router.put('/profile', protect, azureUpload('avatar'), userController.updateProfile);
 

@@ -42,11 +42,7 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
   const isOwnPost = currentUser?._id === post.userId._id;
 
   // Get all media
-  const allMedia = post.images && post.images.length > 0
-    ? post.images
-    : post.image
-    ? [post.image]
-    : [];
+  const allMedia = post.media || [];
 
   const hasMultipleMedia = allMedia.length > 1;
 
@@ -141,9 +137,11 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
     }
   };
 
-  const handleCardClick = () => {
+  // ✅ Handler untuk open modal - hanya dari button comment
+  const handleOpenComments = (e) => {
+    e.stopPropagation();
     if (onOpenModal) {
-      onOpenModal(post);
+      onOpenModal(post._id);
     }
   };
 
@@ -227,7 +225,7 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
                   <button
                     onClick={() => {
                       setShowMenu(false);
-                      onOpenModal && onOpenModal(post, 'edit');
+                      onOpenModal && onOpenModal(post._id, 'edit');
                     }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-blue-500 hover:bg-dark-800 rounded-lg transition-colors"
                   >
@@ -248,20 +246,17 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
         )}
       </div>
 
-      {/* Media Carousel - Clickable to open modal */}
+      {/* Media Carousel - NO CLICK HANDLER */}
       {allMedia.length > 0 && (
-        <div
-          className="relative bg-dark-900 group cursor-pointer"
-          onClick={handleCardClick}
-        >
+        <div className="relative bg-dark-900 group">
           {/* Current Media */}
           <div className="relative w-full max-h-[600px] flex items-center justify-center bg-black">
             {isVideo(allMedia[currentMediaIndex]) ? (
               <video
                 key={currentMediaIndex}
                 src={getMediaUrl(allMedia[currentMediaIndex])}
+                controls
                 className="w-full max-h-[600px] object-contain"
-                onClick={(e) => e.stopPropagation()}
               />
             ) : (
               <img
@@ -331,8 +326,9 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
           {post.likesCount > 0 && <span>{post.likesCount}</span>}
         </button>
 
+        {/* ✅ Comment button - triggers modal */}
         <button
-          onClick={handleCardClick}
+          onClick={handleOpenComments}
           className="post-action-btn"
         >
           <MessageCircle size={24} />
@@ -352,8 +348,8 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
         </button>
       </div>
 
-      {/* Content Preview - Clickable to open modal */}
-      <div className="post-content pb-2 cursor-pointer" onClick={handleCardClick}>
+      {/* Content Preview */}
+      <div className="post-content pb-2">
         <p className="text-sm break-words">
           <Link
             to={`/profile/${post.userId._id}`}
@@ -368,10 +364,10 @@ const PostCard = ({ post, onUpdate, onOpenModal }) => {
           )}
         </p>
 
-        {/* Comments Preview */}
+        {/* Comments Preview - triggers modal */}
         {post.commentsCount > 0 && (
           <button
-            onClick={handleCardClick}
+            onClick={handleOpenComments}
             className="text-sm text-gray-400 hover:text-gray-300 mt-1 transition-colors"
           >
             Lihat {post.commentsCount} komentar
