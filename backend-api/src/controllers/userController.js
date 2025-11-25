@@ -477,3 +477,85 @@ exports.getFollowing = async (req, res) => {
     });
   }
 };
+
+// @desc    Get recommended users to follow
+// @route   GET /api/users/recommended
+// @access  Private
+exports.getRecommendedUsers = async (req, res) => {
+  try {
+    const currentUserId = req.user.userId;
+    const limit = parseInt(req.query.limit) || 5;
+
+    console.log('🔍 Getting recommended users for:', currentUserId);
+
+    // Get users that current user is already following
+    const following = await Follower.find({ followerId: currentUserId })
+      .select('followingId')
+      .lean();
+    
+    const followingIds = following.map(f => f.followingId.toString());
+    followingIds.push(currentUserId); // Exclude self
+
+    // Strategy: Find users with most followers that current user doesn't follow
+    const mongoose = require('mongoose');
+    const excludeIds = followingIds.map(id => 
+      typeof id === 'string' ? new mongoose.Types.ObjectId(id) : id
+    );
+
+    const recommendedUsers = await User.aggregate([
+      // Exclude current user and users already followed
+      {
+        $match: {
+          _id: { $nin: excludeIds }
+        }
+      },
+      // Lookup followers count
+      {
+        $lookup: {
+          from: 'followers',
+          localField: '_id',
+          foreignField: 'followingId',
+          as: 'followers'
+        }
+      },
+      // Add followers count
+      {
+        $addFields: {
+          followersCount: { $size: '$followers' }
+        }
+      },
+      // Sort by followers count (most popular first)
+      {
+        $sort: { followersCount: -1 }
+      },
+      // Limit results
+      {
+        $limit: limit
+      },
+      // Project only needed fields
+      {
+        $project: {
+          username: 1,
+          fullName: 1,
+          avatar: 1,
+          bio: 1,
+          followersCount: 1
+        }
+      }
+    ]);
+
+    console.log(`✅ Found ${recommendedUsers.length} recommended users`);
+
+    res.json({
+      success: true,
+      message: 'Recommended users retrieved successfully',
+      data: recommendedUsers
+    });
+  } catch (error) {
+    console.error('❌ Get recommended users error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to get recommended users'
+    });
+  }
+};
