@@ -6,7 +6,6 @@ import PostCard from '../components/post/PostCard';
 import PostDetailModal from '../components/post/PostDetailModal';
 import FollowersModal from '../components/user/FollowersModal';
 import EditProfileModal from '../components/user/EditProfileModal';
-import RecommendedUsers from '../components/user/RecommendedUsers';
 import { Loader2, Settings, Grid, Bookmark, UserPlus, UserMinus, MessageCircle, MapPin, Link as LinkIcon, Calendar } from 'lucide-react';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
@@ -92,6 +91,23 @@ const ProfilePage = () => {
     setShowEditModal(true);
   };
 
+  const handleOpenModal = (postId) => {
+    setSelectedPostId(postId);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedPostId(null);
+  };
+
+  const handleModalUpdate = () => {
+    if (activeTab === 'posts') {
+      refetchProfile();
+    } else {
+      refetchSaved();
+    }
+    setSelectedPostId(null);
+  };
+
   if (profileLoading) {
     return (
       <div className="flex justify-center items-center min-h-[50vh]">
@@ -110,12 +126,9 @@ const ProfilePage = () => {
   }) : '';
 
   return (
-    <div className="max-w-7xl mx-auto pb-6">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Content */}
-        <div className="lg:col-span-2">
-          {/* Profile Header */}
-          <div className="card mb-6">
+    <div className="max-w-4xl mx-auto pb-6"> {/* ✅ Changed from max-w-7xl to max-w-4xl */}
+      {/* Profile Header */}
+      <div className="card mb-6">
         {/* Cover Photo Area */}
         <div className="h-32 bg-gradient-to-r from-primary-500/20 via-pink-500/20 to-purple-500/20 rounded-t-xl"></div>
         
@@ -249,9 +262,9 @@ const ProfilePage = () => {
         </div>
       </div>
 
-          {/* Tabs */}
-          <div className="card mb-6">
-            <div className="flex justify-center border-b border-dark-800">
+      {/* Tabs */}
+      <div className="card mb-6">
+        <div className="flex justify-center border-b border-dark-800">
           <button
             onClick={() => setActiveTab('posts')}
             className={`flex items-center gap-2 px-8 py-4 border-b-2 transition-colors font-semibold ${
@@ -277,62 +290,44 @@ const ProfilePage = () => {
               <span>SAVED</span>
             </button>
           )}
-            </div>
-          </div>
-
-          {/* Posts Feed */}
-          {currentLoading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="animate-spin text-primary-500" size={32} />
-            </div>
-          ) : currentPosts && currentPosts.length > 0 ? (
-            <div className="space-y-6">
-              {currentPosts.map((post) => (
-                <div 
-                  key={post._id}
-                  onClick={() => setSelectedPostId(post._id)}
-                  className="cursor-pointer"
-                >
-                  <PostCard
-                    post={post}
-                    onUpdate={activeTab === 'posts' ? refetchProfile : refetchSaved}
-                  />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="card p-12 text-center bg-gradient-to-br from-dark-900 to-black border border-dark-800">
-              <div className="w-20 h-20 bg-dark-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                {activeTab === 'posts' ? (
-                  <span className="text-4xl">📸</span>
-                ) : (
-                  <span className="text-4xl">🔖</span>
-                )}
-              </div>
-              <h3 className="text-xl font-semibold mb-2">
-                {activeTab === 'posts' ? 'No posts yet' : 'No saved posts'}
-              </h3>
-              <p className="text-gray-400">
-                {activeTab === 'posts' 
-                  ? 'Share your first post to get started' 
-                  : 'Posts you save will appear here'}
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Sidebar - Recommended Users (Desktop) */}
-        <div className="hidden lg:block">
-          <div className="sticky top-20">
-            <RecommendedUsers limit={5} />
-          </div>
         </div>
       </div>
 
-      {/* Recommended Users (Mobile - Below Profile) */}
-      <div className="lg:hidden mt-6">
-        <RecommendedUsers limit={5} />
-      </div>
+      {/* Posts Feed */}
+      {currentLoading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="animate-spin text-primary-500" size={32} />
+        </div>
+      ) : currentPosts && currentPosts.length > 0 ? (
+        <div className="space-y-6">
+          {currentPosts.map((post) => (
+            <PostCard
+              key={post._id}
+              post={post}
+              onUpdate={handleModalUpdate}
+              onOpenModal={handleOpenModal}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="card p-12 text-center bg-gradient-to-br from-dark-900 to-black border border-dark-800">
+          <div className="w-20 h-20 bg-dark-800 rounded-full flex items-center justify-center mx-auto mb-4">
+            {activeTab === 'posts' ? (
+              <span className="text-4xl">📸</span>
+            ) : (
+              <span className="text-4xl">🔖</span>
+            )}
+          </div>
+          <h3 className="text-xl font-semibold mb-2">
+            {activeTab === 'posts' ? 'No posts yet' : 'No saved posts'}
+          </h3>
+          <p className="text-gray-400">
+            {activeTab === 'posts' 
+              ? 'Share your first post to get started' 
+              : 'Posts you save will appear here'}
+          </p>
+        </div>
+      )}
 
       {/* Modals */}
       <FollowersModal
@@ -354,8 +349,8 @@ const ProfilePage = () => {
       {selectedPostId && (
         <PostDetailModal
           postId={selectedPostId}
-          onClose={() => setSelectedPostId(null)}
-          onUpdate={activeTab === 'posts' ? refetchProfile : refetchSaved}
+          onClose={handleCloseModal}
+          onUpdate={handleModalUpdate}
         />
       )}
     </div>
