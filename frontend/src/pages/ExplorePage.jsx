@@ -60,11 +60,7 @@ const ExplorePage = () => {
   };
 
   const getPostMedia = (post) => {
-    const allMedia = post.images && post.images.length > 0 
-      ? post.images 
-      : post.image 
-      ? [post.image] 
-      : [];
+    const allMedia = post.media || [];
     
     return {
       media: allMedia,

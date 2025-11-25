@@ -17,17 +17,16 @@ exports.createPost = async (req, res) => {
             });
         }
 
-        // ✅ Handle multiple images
-        let imageUrls = [];
+        //  Handle multiple media (images/videos)
+        let mediaUrls = [];
         if (req.uploadedFiles && req.uploadedFiles.length > 0) {
-            imageUrls = req.uploadedFiles;
+            mediaUrls = req.uploadedFiles;
         }
 
         const post = new Post({
             userId,
             content: content.trim(),
-            images: imageUrls, // Array of URLs
-            image: imageUrls[0] || '' // First image for backward compatibility
+            media: mediaUrls // Array of media URLs
         });
 
         await post.save();
@@ -132,10 +131,9 @@ exports.updatePost = async (req, res) => {
 
         if (content !== undefined) post.content = content.trim();
         
-        // ✅ Update images jika ada upload baru
+        // Update media jika ada upload baru
         if (req.uploadedFiles && req.uploadedFiles.length > 0) {
-            post.images = req.uploadedFiles;
-            post.image = req.uploadedFiles[0];
+            post.media = req.uploadedFiles;
         }
 
         await post.save();

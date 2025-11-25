@@ -18,6 +18,10 @@ const HomePage = () => {
     },
   });
 
+  const handleOpenModal = (postId) => {
+    setSelectedPostId(postId);
+  };
+
   if (isLoading) {
     return (
       <div className="flex flex-col justify-center items-center min-h-[50vh] space-y-4">
@@ -55,16 +59,12 @@ const HomePage = () => {
       {data && data.length > 0 ? (
         <div className="space-y-6">
           {data.map((post) => (
-            <div 
-              key={post._id} 
-              onClick={() => setSelectedPostId(post._id)} 
-              className="cursor-pointer"
-            >
-              <PostCard 
-                post={post} 
-                onUpdate={refetch}
-              />
-            </div>
+            <PostCard
+              key={post._id}
+              post={post}
+              onUpdate={refetch}
+              onOpenModal={handleOpenModal}
+            />
           ))}
         </div>
       ) : (
