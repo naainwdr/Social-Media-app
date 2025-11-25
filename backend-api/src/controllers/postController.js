@@ -7,6 +7,58 @@ const Notification = require('../models/Notification');
 const User = require('../models/User');
 const { createNotification } = require('../controllers/notificationController');
 
+// Helper function to notify followers of new post/story
+const notifyFollowers = async (userId, content, relatedId, relatedType, io, onlineUsers, req) => {
+  try {
+    console.log(`📢 notifyFollowers called for ${relatedType}:`, relatedId);
+    
+    // Get all followers of this user
+    const followers = await Follower.find({ followingId: userId }).select('followerId');
+    console.log(`📢 Found ${followers.length} followers`);
+
+    if (followers.length === 0) {
+      console.log('📢 No followers to notify');
+      return;
+    }
+
+    const followerIds = followers.map(f => f.followerId);
+
+    // Create notifications for each follower
+    for (const followerId of followerIds) {
+      try {
+        const notificationType = relatedType === 'Post' ? 'post' : 'story';
+        const notification = new Notification({
+          recipientId: followerId,
+          senderId: userId,
+          type: notificationType,
+          content: `membagikan ${relatedType === 'Post' ? 'postingan' : 'cerita'} baru`,
+          relatedId,
+          relatedType
+        });
+
+        await notification.save();
+        console.log(`   ✅ Notification saved for follower:`, followerId);
+
+        await notification.populate('senderId', 'username avatar');
+        await notification.populate('relatedId', 'content media');
+
+        // Try to emit to follower if online
+        if (io && onlineUsers) {
+          const followerSocketId = onlineUsers.get(followerId.toString());
+          if (followerSocketId) {
+            io.to(followerSocketId).emit('receive-notification', notification);
+            console.log(`   📡 Notification emitted to follower:`, followerId);
+          }
+        }
+      } catch (err) {
+        console.error(`   ❌ Error creating notification for follower ${followerId}:`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error('❌ Error in notifyFollowers:', err.message);
+  }
+};
+
 // Helper function to extract and notify mentions
 const handleMentions = async (content, senderId, relatedId, relatedType, io, onlineUsers, req) => {
   try {
@@ -120,6 +172,9 @@ exports.createPost = async (req, res) => {
         const io = req.app.get('io');
         const onlineUsers = req.app.get('onlineUsers');
         await handleMentions(content.trim(), userId, post._id, 'Post', io, onlineUsers, req);
+
+        // Notify followers of new post
+        await notifyFollowers(userId, content.trim(), post._id, 'Post', io, onlineUsers, req);
 
         res.status(201).json({
             success: true,
