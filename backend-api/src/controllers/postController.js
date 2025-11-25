@@ -3,6 +3,8 @@ const Like = require('../models/Like');
 const SavedPost = require('../models/SavedPost');
 const Comment = require('../models/Comment');
 const Follower = require('../models/Follower');
+const Notification = require('../models/Notification');
+const { createNotification } = require('../controllers/notificationController');
 
 // Create post
 exports.createPost = async (req, res) => {
@@ -342,6 +344,52 @@ exports.likePost = async (req, res) => {
         }
 
         const likesCount = await Like.countDocuments({ postId: id });
+
+        // Trigger notification jika like dan bukan post sendiri
+        if (isLiked && post.userId.toString() !== userId) {
+            try {
+                console.log('\n🔵 NOTIF DEBUG - Like detected');
+                console.log('   Post owner:', post.userId.toString());
+                console.log('   Liker:', userId);
+                console.log('   Different user? YES - Create notification');
+
+                const notification = new Notification({
+                    recipientId: post.userId,
+                    senderId: userId,
+                    type: 'like',
+                    content: 'liked your post',
+                    relatedId: post._id,
+                    relatedType: 'Post'
+                });
+                
+                console.log('   Saving to DB...');
+                await notification.save();
+                console.log('   ✅ Saved:', notification._id);
+
+                await notification.populate('senderId', 'username avatar');
+                await notification.populate('relatedId', 'content image');
+
+                // Emit via Socket.IO
+                const io = req.app.get('io');
+                const onlineUsers = req.app.get('onlineUsers');
+                const recipientSocketId = onlineUsers.get(post.userId.toString());
+                
+                console.log('   Socket emit:');
+                console.log('   - Recipient ID:', post.userId.toString());
+                console.log('   - Socket ID:', recipientSocketId || 'NOT_ONLINE');
+                
+                if (recipientSocketId) {
+                    io.to(recipientSocketId).emit('receive-notification', notification);
+                    console.log('   ✅ Socket emitted successfully\n');
+                } else {
+                    console.log('   ⚠️  Recipient not online\n');
+                }
+            } catch (notifError) {
+                console.error('❌ Error creating notification:', notifError);
+            }
+        } else {
+            console.log('\n🔵 NOTIF DEBUG - Like not sent (isLiked:', isLiked, ', same user?', post.userId.toString() === userId, ')\n');
+        }
 
         res.json({
             success: true,

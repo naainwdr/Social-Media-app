@@ -1,6 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Home, Search, PlusSquare, MessageCircle, User, LogOut, BarChart3 } from 'lucide-react';
+import { NotificationBell } from '../notification/NotificationBell';
 
 const Layout = () => {
   const { user, logout } = useAuth();
@@ -50,9 +51,16 @@ const Layout = () => {
             ))}
           </nav>
 
-          {/* User Info */}
-          <div className="border-t border-dark-800 pt-4 mt-4">
-            <div className="flex items-center gap-3 px-3 mb-3">
+          {/* User Info & Notifications */}
+          <div className="border-t border-dark-800 pt-4 mt-4 space-y-3">
+            {/* Notification Bell */}
+            <div className="flex items-center justify-between px-3">
+              <span className="text-sm text-gray-400">Notifikasi</span>
+              <NotificationBell />
+            </div>
+
+            {/* User Info */}
+            <div className="flex items-center gap-3 px-3">
               <div className="avatar w-10 h-10 bg-gradient-instagram">
                 {user?.avatar ? (
                   <img src={user.avatar} alt={user.username} />
@@ -102,6 +110,10 @@ const Layout = () => {
               <item.icon size={24} />
             </Link>
           ))}
+          {/* Notification Bell - Mobile */}
+          <div className="flex items-center justify-center w-12 h-12 rounded-lg">
+            <NotificationBell />
+          </div>
           <button
             onClick={logout}
             className="flex items-center justify-center w-12 h-12 rounded-lg text-gray-400 hover:text-white transition-colors"

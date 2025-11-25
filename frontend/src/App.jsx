@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext'; // ✅ ADD
+import { NotificationProvider } from './context/NotificationContext';
 
 // Pages
 import LoginPage from './pages/LoginPage';
@@ -37,6 +38,7 @@ function App() {
       <Router>
         <AuthProvider>
           <SocketProvider> {/* ✅ ADD */}
+            <NotificationProvider>
             <Routes>
               {/* Public routes */}
               <Route path="/login" element={<LoginPage />} />
@@ -81,12 +83,14 @@ function App() {
                   },
                 },
               }}
-            />
+              />
+              </NotificationProvider>
           </SocketProvider> {/* ✅ ADD */}
         </AuthProvider>
       </Router>
     </QueryClientProvider>
   );
 }
+
 
 export default App;
