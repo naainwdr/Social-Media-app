@@ -1,41 +1,37 @@
 const mongoose = require('mongoose');
+const { Schema } = mongoose;
 
-const messageSchema = new mongoose.Schema({
+const messageSchema = new Schema({
   senderId: {
-    type: mongoose.Schema.Types.ObjectId,
+    type: Schema.Types.ObjectId,
     ref: 'User',
     required: true,
     index: true
   },
   receiverId: {
-    type: mongoose.Schema.Types.ObjectId,
+    type: Schema.Types.ObjectId,
     ref: 'User',
     required: true,
     index: true
   },
   content: {
     type: String,
-    required: function() {
-      return !this.media; // Content required if no media
-    },
     trim: true
   },
   media: {
-    type: String, // URL to image/video
-    default: null
+    type: String
   },
   mediaType: {
     type: String,
-    enum: ['image', 'video', null],
-    default: null
+    enum: ['image', 'video'],
   },
   isRead: {
     type: Boolean,
-    default: false
+    default: false,
+    index: true // ✅ Add index for faster queries
   },
   readAt: {
-    type: Date,
-    default: null
+    type: Date
   }
 }, {
   timestamps: true

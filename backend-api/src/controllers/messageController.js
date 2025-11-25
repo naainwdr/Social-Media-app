@@ -127,7 +127,8 @@ const getMessages = async (req, res) => {
     })
       .populate('senderId', 'username avatar')
       .populate('receiverId', 'username avatar')
-      .sort({ createdAt: 1 });
+      .sort({ createdAt: 1 })
+      .lean();
 
     // Mark messages as read
     await Message.updateMany(

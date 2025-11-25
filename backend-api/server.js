@@ -1,6 +1,6 @@
 const express = require('express');
-const http = require('http'); // ✅ ADD
-const socketIo = require('socket.io'); // ✅ ADD
+const http = require('http'); // ADD
+const socketIo = require('socket.io'); // ADD
 const dotenv = require('dotenv');
 const cors = require('cors');
 const path = require('path');
@@ -45,16 +45,16 @@ const checkAzureConnection = async () => {
 };
 
 const app = express();
-const server = http.createServer(app); // ✅ CREATE HTTP SERVER
+const server = http.createServer(app); // CREATE HTTP SERVER
 
-// ✅ SETUP SOCKET.IO - Add transports & better config
+// SETUP SOCKET.IO - Add transports & better config
 const io = socketIo(server, {
     cors: {
         origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
         methods: ['GET', 'POST'],
         credentials: true
     },
-    transports: ['websocket', 'polling'], // ✅ ADD: Support both transports
+    transports: ['websocket', 'polling'], // ADD: Support both transports
     pingTimeout: 60000,
     pingInterval: 25000,
     upgradeTimeout: 30000,
@@ -78,11 +78,11 @@ const onlineUsers = new Map();
 
 io.on('connection', (socket) => {
     console.log('🔌 New client connected:', socket.id);
-    console.log('🔧 Transport:', socket.conn.transport.name); // ✅ Log transport type
+    console.log('🔧 Transport:', socket.conn.transport.name); // Log transport type
 
-    // ✅ User joins with their userId
+    // User joins with their userId
     socket.on('join', (userId) => {
-        // ✅ Check for duplicate connections
+        // Check for duplicate connections
         const existingSocketId = onlineUsers.get(userId);
         if (existingSocketId && existingSocketId !== socket.id) {
             console.log('⚠️ User already connected, replacing old socket:', userId);
@@ -93,16 +93,16 @@ io.on('connection', (socket) => {
         }
 
         onlineUsers.set(userId, socket.id);
-        socket.userId = userId; // ✅ Store userId in socket
+        socket.userId = userId; // Store userId in socket
         
         console.log('👤 User joined:', userId, '| Socket:', socket.id);
         console.log('📊 Online users:', onlineUsers.size);
         console.log('📋 Online users list:', Array.from(onlineUsers.keys()));
         
-        // ✅ Send current online users to joining user
+        // Send current online users to joining user
         socket.emit('online-users', Array.from(onlineUsers.keys()));
         
-        // ✅ Broadcast to ALL (including sender)
+        // Broadcast to ALL (including sender)
         io.emit('user-online', userId);
     });
 
@@ -112,15 +112,37 @@ io.on('connection', (socket) => {
         
         const receiverSocketId = onlineUsers.get(messageData.receiverId);
         if (receiverSocketId) {
-            // ✅ Send to receiver
+            // Send to receiver
             io.to(receiverSocketId).emit('receive-message', messageData);
-            console.log('✅ Message delivered to:', messageData.receiverId);
+            console.log('Message delivered to:', messageData.receiverId);
             
-            // ✅ Confirm to sender
+            // Confirm to sender
             socket.emit('message-sent', { messageId: messageData.message._id });
         } else {
             console.log('⚠️ Receiver offline:', messageData.receiverId);
             socket.emit('receiver-offline', { receiverId: messageData.receiverId });
+        }
+    });
+
+    //  Handle mark as read
+    socket.on('mark-as-read', async ({ messageIds, senderId }) => {
+        try {
+            console.log('📖 Mark as read:', { messageIds, senderId });
+            
+            // Update messages in database
+            await Message.updateMany(
+            { _id: { $in: messageIds } },
+            { isRead: true, readAt: new Date() }
+            );
+            
+            // Notify sender that messages were read
+            const senderSocketId = onlineUsers.get(senderId);
+            if (senderSocketId) {
+            io.to(senderSocketId).emit('messages-read', { messageIds });
+            console.log('✅ Read receipt sent to sender:', senderId);
+            }
+        } catch (error) {
+            console.error('❌ Error marking as read:', error);
         }
     });
 
@@ -130,7 +152,7 @@ io.on('connection', (socket) => {
         const receiverSocketId = onlineUsers.get(receiverId);
         if (receiverSocketId) {
             io.to(receiverSocketId).emit('user-typing', userId);
-            console.log('✅ Typing indicator sent');
+            console.log('Typing indicator sent');
         }
     });
 
@@ -164,7 +186,7 @@ io.on('connection', (socket) => {
             const recipientSocketId = onlineUsers.get(notificationData.recipientId);
             if (recipientSocketId) {
                 io.to(recipientSocketId).emit('receive-notification', notification);
-                console.log('✅ Notification delivered to:', notificationData.recipientId);
+                console.log('Notification delivered to:', notificationData.recipientId);
             } else {
                 console.log('⚠️ Recipient offline:', notificationData.recipientId);
             }
@@ -174,7 +196,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    // ✅ Handle transport upgrade
+    // Handle transport upgrade
     socket.conn.on('upgrade', (transport) => {
         console.log('🔄 Transport upgraded to:', transport.name);
     });
