@@ -287,50 +287,6 @@ exports.followUser = async (req, res) => {
             error: 'Terjadi kesalahan saat follow/unfollow user'
         });
     }
-
-    // Can't follow yourself
-    if (id === currentUserId) {
-      return res.status(400).json({
-        success: false,
-        error: "Anda tidak bisa follow diri sendiri",
-      });
-    }
-
-    // Check if already following
-    const existingFollow = await Follower.findOne({
-      followerId: currentUserId,
-      followingId: id,
-    });
-
-    if (existingFollow) {
-      // Unfollow
-      await Follower.findByIdAndDelete(existingFollow._id);
-
-      return res.json({
-        success: true,
-        message: "Berhasil unfollow user",
-        isFollowing: false,
-      });
-    } else {
-      // Follow
-      await Follower.create({
-        followerId: currentUserId,
-        followingId: id,
-      });
-
-      return res.json({
-        success: true,
-        message: "Berhasil follow user",
-        isFollowing: true,
-      });
-    }
-  } catch (error) {
-    console.error("Follow user error:", error);
-    res.status(500).json({
-      success: false,
-      error: "Terjadi kesalahan saat follow/unfollow user",
-    });
-  }
 };
 
 // Get saved posts
