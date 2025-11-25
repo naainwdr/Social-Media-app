@@ -4,6 +4,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { Trash2, Check } from 'lucide-react';
 import { markNotificationAsRead, deleteNotification } from '../../services/notificationService';
+import api from '../../services/api';
 import toast from 'react-hot-toast';
 
 export const NotificationItem = ({ notification, onRead, onDelete }) => {
@@ -66,6 +67,8 @@ export const NotificationItem = ({ notification, onRead, onDelete }) => {
                 return '❤️';
             case 'comment':
                 return '💬';
+            case 'mention':
+                return '🏷️';
             case 'follow':
                 return '👤';
             case 'message':
@@ -83,6 +86,8 @@ export const NotificationItem = ({ notification, onRead, onDelete }) => {
                 return `${notification.senderId?.username} menyukai postingan Anda`;
             case 'comment':
                 return `${notification.senderId?.username} mengomentari postingan Anda`;
+            case 'mention':
+                return `${notification.senderId?.username} menyebut Anda`;
             case 'follow':
                 return `${notification.senderId?.username} mulai mengikuti Anda`;
             case 'message':
@@ -99,7 +104,8 @@ export const NotificationItem = ({ notification, onRead, onDelete }) => {
         locale: id
     });
 
-    const handleNotificationClick = () => {
+    const handleNotificationClick = async () => {
+        console.debug('🔔 Notification click:', notification);
         // Mark as read
         if (!notification.isRead) {
             handleMarkAsRead();
@@ -108,12 +114,72 @@ export const NotificationItem = ({ notification, onRead, onDelete }) => {
         // Navigate based on notification type
         switch (notification.type) {
             case 'like':
-            case 'comment':
-                // Navigate to post if relatedId exists
+                // For likes, relatedId is the Post._id directly
                 if (notification.relatedId?._id) {
-                    navigate(`/?postId=${notification.relatedId._id}`);
-                    // Or if you have a post detail page:
-                    // navigate(`/post/${notification.relatedId._id}`);
+                    const target = `/?postId=${notification.relatedId._id}`;
+                    console.debug('🔔 Navigating to post (like)', target);
+                    navigate(target);
+                }
+                break;
+
+            case 'mention':
+                // For mentions, relatedType indicates if it's a Post or Comment
+                if (notification.relatedType === 'Post' && notification.relatedId?._id) {
+                    // Mention in a post
+                    const target = `/?postId=${notification.relatedId._id}`;
+                    console.debug('🔔 Navigating to post (mention)', target);
+                    navigate(target);
+                } else if (notification.relatedType === 'Comment' && notification.relatedId?._id) {
+                    // Mention in a comment - try to get postId
+                    if (notification.relatedId?.postId) {
+                        const target = `/?postId=${notification.relatedId.postId}&commentId=${notification.relatedId._id}`;
+                        console.debug('🔔 Navigating to comment (mention)', target);
+                        navigate(target);
+                    } else {
+                        // Fallback: fetch comment to get postId
+                        try {
+                            const commentId = notification.relatedId._id;
+                            console.debug('🔔 Fetching comment for mention fallback:', commentId);
+                            const res = await api.get(`/comments/${commentId}`);
+                            const comment = res.data.data;
+                            if (comment?.postId) {
+                                const target = `/?postId=${comment.postId}&commentId=${comment._id}`;
+                                console.debug('🔔 Navigating to comment (mention fallback)', target);
+                                navigate(target);
+                            }
+                        } catch (err) {
+                            console.error('❌ Failed to fetch comment for mention notification', err);
+                        }
+                    }
+                }
+                break;
+
+            case 'comment':
+                // For comments, relatedId is a Comment object (may or may not have postId)
+                if (notification.relatedId?.postId) {
+                    const target = `/?postId=${notification.relatedId.postId}&commentId=${notification.relatedId._id}`;
+                    console.debug('🔔 Navigating to', target);
+                    navigate(target);
+                } else if (notification.relatedId?._id) {
+                    // Fallback: try fetching the comment to get its postId
+                    try {
+                        const commentId = notification.relatedId._id;
+                        console.debug('🔔 Fetching comment for fallback:', commentId);
+                        const res = await api.get(`/comments/${commentId}`);
+                        const comment = res.data.data;
+                        if (comment?.postId) {
+                            const target = `/?postId=${comment.postId}&commentId=${comment._id}`;
+                            console.debug('🔔 Navigating to (from fetched comment)', target);
+                            navigate(target);
+                        } else {
+                            // As a last resort, navigate to root
+                            console.warn('⚠️ Comment had no postId; opening feed');
+                            navigate('/');
+                        }
+                    } catch (err) {
+                        console.error('❌ Failed to fetch comment for notification fallback', err);
+                        navigate('/');
+                    }
                 }
                 break;
 
@@ -165,6 +231,15 @@ export const NotificationItem = ({ notification, onRead, onDelete }) => {
                     {getNotificationMessage()}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">{timeAgo}</p>
+
+                {/* If this is a comment notification, show a small preview of the comment/post */}
+                {notification.type === 'comment' && (notification.relatedId?.content || notification.content) && (
+                    <div className="mt-2 p-2 bg-dark-800 rounded text-xs text-gray-300">
+                        {String(notification.relatedId?.content || notification.content).length > 200
+                            ? String(notification.relatedId?.content || notification.content).slice(0, 200) + '...'
+                            : notification.relatedId?.content || notification.content}
+                    </div>
+                )}
             </div>
 
             {/* Actions */}

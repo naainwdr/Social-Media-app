@@ -1,10 +1,81 @@
-const Post = require("../models/Post");
-const Like = require("../models/Like");
-const SavedPost = require("../models/SavedPost");
-const Comment = require("../models/Comment");
-const Follower = require("../models/Follower");
-const Notification = require("../models/Notification");
-const { createNotification } = require("../controllers/notificationController");
+const Post = require('../models/Post');
+const Like = require('../models/Like');
+const SavedPost = require('../models/SavedPost');
+const Comment = require('../models/Comment');
+const Follower = require('../models/Follower');
+const Notification = require('../models/Notification');
+const User = require('../models/User');
+const { createNotification } = require('../controllers/notificationController');
+
+// Helper function to extract and notify mentions
+const handleMentions = async (content, senderId, relatedId, relatedType, io, onlineUsers, req) => {
+  try {
+    console.log('🏷️  handleMentions called with content:', content);
+    
+    // Extract all @username mentions from content
+    const mentionRegex = /@(\w+)/g;
+    const mentions = [];
+    let match;
+    
+    while ((match = mentionRegex.exec(content)) !== null) {
+      mentions.push(match[1]);
+    }
+
+    console.log('🏷️  Mentions found:', mentions.length > 0 ? mentions : 'none');
+
+    if (mentions.length === 0) {
+      console.log('🏷️  No mentions detected, skipping notification creation');
+      return;
+    }
+
+    console.log('🏷️  MENTIONS detected:', mentions);
+
+    // Find users matching the mentioned usernames
+    const mentionedUsers = await User.find({ username: { $in: mentions } }).select('_id username');
+    console.log('🏷️  Found users:', mentionedUsers.length);
+
+    // Create notifications for each mentioned user (if not the sender)
+    for (const user of mentionedUsers) {
+      if (user._id.toString() === senderId.toString()) {
+        console.log('   ⊘ Skipping self-mention for:', user.username);
+        continue; // Don't notify if mentioning yourself
+      }
+
+      try {
+        const notification = new Notification({
+          recipientId: user._id,
+          senderId,
+          type: 'mention',
+          content: `menyebut Anda di ${relatedType === 'Post' ? 'postingan' : 'komentar'}`,
+          relatedId,
+          relatedType
+        });
+
+        await notification.save();
+        console.log('   ✅ Mention notification saved for:', user.username);
+        
+        await notification.populate('senderId', 'username avatar');
+        await notification.populate('relatedId', 'content postId');
+
+        // Try to emit to recipient if online
+        if (io && onlineUsers) {
+          const recipientSocketId = onlineUsers.get(user._id.toString());
+          console.log('   📡 Checking socket for', user.username, '- socketId:', recipientSocketId || 'NOT_ONLINE');
+          if (recipientSocketId) {
+            io.to(recipientSocketId).emit('receive-notification', notification);
+            console.log('   ✅ Mention notification emitted to:', user.username);
+          }
+        } else {
+          console.log('   ⚠️ io or onlineUsers not available for socket emit');
+        }
+      } catch (err) {
+        console.error('   ❌ Error creating mention notification for', user.username, err.message);
+      }
+    }
+  } catch (err) {
+    console.error('❌ Error in handleMentions:', err.message);
+  }
+};
 
 // Create post
 exports.createPost = async (req, res) => {
@@ -12,11 +83,55 @@ exports.createPost = async (req, res) => {
     const { content, location } = req.body;
     const userId = req.user.userId;
 
-    if (!content || !content.trim()) {
-      return res.status(400).json({
-        success: false,
-        error: "Content wajib diisi",
-      });
+        if (!content || !content.trim()) {
+            return res.status(400).json({
+                success: false,
+                error: 'Content wajib diisi'
+            });
+        }
+
+        //  Handle multiple media (images/videos)
+        let mediaUrls = [];
+        if (req.uploadedFiles && req.uploadedFiles.length > 0) {
+            mediaUrls = req.uploadedFiles;
+        }
+
+        // Parse location if provided (from JSON string)
+        let locationData = null;
+        if (location) {
+            try {
+                locationData = typeof location === 'string' ? JSON.parse(location) : location;
+            } catch (e) {
+                console.error('Location parse error:', e);
+            }
+        }
+
+        const post = new Post({
+            userId,
+            content: content.trim(),
+            media: mediaUrls, // Array of media URLs
+            location: locationData
+        });
+
+        await post.save();
+        await post.populate('userId', 'username email avatar bio');
+
+        // Handle mentions in post content
+        const io = req.app.get('io');
+        const onlineUsers = req.app.get('onlineUsers');
+        await handleMentions(content.trim(), userId, post._id, 'Post', io, onlineUsers, req);
+
+        res.status(201).json({
+            success: true,
+            message: 'Post berhasil dibuat',
+            data: post
+        });
+    } catch (error) {
+        console.error('Create post error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Terjadi kesalahan saat membuat post'
+        });
     }
 
     //  Handle multiple media (images/videos)

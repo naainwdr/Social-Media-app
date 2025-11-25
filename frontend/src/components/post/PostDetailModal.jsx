@@ -16,7 +16,7 @@ const getMediaUrl = (mediaPath) => {
   return `${API_URL}${mediaPath}`;
 };
 
-const PostDetailModal = ({ postId, onClose, onUpdate }) => {
+const PostDetailModal = ({ postId, onClose, onUpdate, highlightCommentId = null }) => {
   const { user: currentUser } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
