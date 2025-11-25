@@ -80,7 +80,7 @@ const handleMentions = async (content, senderId, relatedId, relatedType, io, onl
 // Create post
 exports.createPost = async (req, res) => {
     try {
-        const { content } = req.body;
+        const { content, location } = req.body;
         const userId = req.user.userId;
 
         if (!content || !content.trim()) {
@@ -96,10 +96,21 @@ exports.createPost = async (req, res) => {
             mediaUrls = req.uploadedFiles;
         }
 
+        // Parse location if provided (from JSON string)
+        let locationData = null;
+        if (location) {
+            try {
+                locationData = typeof location === 'string' ? JSON.parse(location) : location;
+            } catch (e) {
+                console.error('Location parse error:', e);
+            }
+        }
+
         const post = new Post({
             userId,
             content: content.trim(),
-            media: mediaUrls // Array of media URLs
+            media: mediaUrls, // Array of media URLs
+            location: locationData
         });
 
         await post.save();

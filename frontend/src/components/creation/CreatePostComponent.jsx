@@ -5,13 +5,16 @@ import { useAuth } from '../../context/AuthContext';
 import { useMutation } from '@tanstack/react-query';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
-import { X, Loader2, Upload, Film, Plus, Image as ImageIcon } from 'lucide-react';
+import { X, Loader2, Upload, Film, Plus, Image as ImageIcon, MapPin, Search } from 'lucide-react';
 
 const CreatePostComponent = ({ onPostCreated }) => {
   const { user } = useAuth();
   const [content, setContent] = useState('');
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [previews, setPreviews] = useState([]);
+  const [location, setLocation] = useState(null);
+  const [locationSearch, setLocationSearch] = useState('');
+  const [isSearchingLocation, setIsSearchingLocation] = useState(false);
   const fileInputRef = useRef(null);
 
   // Cleanup function: Membersihkan URL Object saat unmount
@@ -40,6 +43,8 @@ const CreatePostComponent = ({ onPostCreated }) => {
       setContent('');
       setSelectedFiles([]);
       setPreviews([]);
+      setLocation(null);
+      setLocationSearch('');
       onPostCreated(); 
     },
     onError: (error) => {
@@ -93,6 +98,102 @@ const CreatePostComponent = ({ onPostCreated }) => {
     setSelectedFiles(selectedFiles.filter((_, i) => i !== index));
   };
 
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation not supported by your browser');
+      return;
+    }
+
+    setIsSearchingLocation(true);
+    toast.loading('Getting your location...');
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        
+        try {
+          // Reverse geocoding menggunakan Nominatim (OpenStreetMap) - Free API
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
+          );
+          const data = await response.json();
+          
+          const locationName = data.display_name?.split(',').slice(0, 3).join(',') || 'Unknown Location';
+          
+          setLocation({
+            name: locationName,
+            latitude,
+            longitude,
+            address: data.display_name
+          });
+          
+          setLocationSearch(locationName);
+          toast.dismiss();
+          toast.success('Location added!');
+        } catch (error) {
+          console.error('Geocoding error:', error);
+          setLocation({
+            name: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
+            latitude,
+            longitude,
+            address: null
+          });
+          toast.dismiss();
+          toast.success('Location coordinates added!');
+        } finally {
+          setIsSearchingLocation(false);
+        }
+      },
+      (error) => {
+        console.error('Location error:', error);
+        toast.dismiss();
+        toast.error('Could not get your location');
+        setIsSearchingLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  const searchLocation = async () => {
+    if (!locationSearch.trim()) {
+      toast.error('Please enter a location');
+      return;
+    }
+
+    setIsSearchingLocation(true);
+    
+    try {
+      // Geocoding using Nominatim
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationSearch)}&limit=1`
+      );
+      const data = await response.json();
+      
+      if (data && data.length > 0) {
+        const result = data[0];
+        setLocation({
+          name: locationSearch,
+          latitude: parseFloat(result.lat),
+          longitude: parseFloat(result.lon),
+          address: result.display_name
+        });
+        toast.success('Location added!');
+      } else {
+        toast.error('Location not found');
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      toast.error('Failed to search location');
+    } finally {
+      setIsSearchingLocation(false);
+    }
+  };
+
+  const removeLocation = () => {
+    setLocation(null);
+    setLocationSearch('');
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
 
@@ -116,8 +217,14 @@ const CreatePostComponent = ({ onPostCreated }) => {
       formData.append('images', file);
     });
 
+    // Append location if provided
+    if (location) {
+      formData.append('location', JSON.stringify(location));
+    }
+
     // Debug log
     console.log('📤 Uploading post with files:', selectedFiles.length);
+    if (location) console.log('📍 Location:', location.name);
 
     createPostMutation.mutate(formData);
   };
@@ -278,6 +385,80 @@ const CreatePostComponent = ({ onPostCreated }) => {
         <p className="text-xs text-gray-500 mt-1">
           Share your thoughts about {previews.length > 1 ? 'these photos/videos' : 'this photo/video'}
         </p>
+      </div>
+
+      {/* Add Location - OPTIONAL */}
+      <div>
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          Add Location (Optional)
+        </label>
+        
+        {!location ? (
+          <div className="space-y-2">
+            {/* Search Location */}
+            <div className="flex gap-2">
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  value={locationSearch}
+                  onChange={(e) => setLocationSearch(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), searchLocation())}
+                  placeholder="Search location (e.g., Bali, Indonesia)"
+                  className="input pr-10"
+                  disabled={createPostMutation.isPending || isSearchingLocation}
+                />
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+              </div>
+              <button
+                type="button"
+                onClick={searchLocation}
+                disabled={!locationSearch.trim() || isSearchingLocation || createPostMutation.isPending}
+                className="btn btn-secondary px-4 whitespace-nowrap"
+              >
+                {isSearchingLocation ? (
+                  <Loader2 className="animate-spin" size={18} />
+                ) : (
+                  'Search'
+                )}
+              </button>
+            </div>
+
+            {/* Use Current Location */}
+            <button
+              type="button"
+              onClick={getCurrentLocation}
+              disabled={isSearchingLocation || createPostMutation.isPending}
+              className="w-full btn btn-secondary flex items-center justify-center gap-2"
+            >
+              <MapPin size={18} />
+              <span>Use Current Location</span>
+            </button>
+          </div>
+        ) : (
+          // Selected Location Display
+          <div className="flex items-start gap-3 p-3 bg-dark-800/50 rounded-lg border border-dark-700">
+            <MapPin className="text-primary-500 flex-shrink-0 mt-0.5" size={20} />
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-sm">{location.name}</p>
+              {location.address && (
+                <p className="text-xs text-gray-400 mt-0.5 truncate">{location.address}</p>
+              )}
+              {location.latitude && location.longitude && (
+                <p className="text-xs text-gray-500 mt-1">
+                  📍 {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={removeLocation}
+              disabled={createPostMutation.isPending}
+              className="p-1 hover:bg-dark-700 rounded transition-colors flex-shrink-0"
+            >
+              <X size={18} className="text-gray-400 hover:text-red-500" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Actions */}

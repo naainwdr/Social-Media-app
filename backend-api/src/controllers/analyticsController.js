@@ -145,7 +145,7 @@ const getPostStatistics = async (req, res) => {
       {
         $project: {
           content: 1,
-          image: 1,
+          media: 1, // ✅ Changed from 'image' to 'media'
           'user.username': 1,
           'user.avatar': 1,
           'user._id': 1,
@@ -360,7 +360,7 @@ const getTrendingPosts = async (req, res) => {
       {
         $project: {
           content: 1,
-          image: 1,
+          media: 1, // ✅ Changed from 'image' to 'media'
           'user._id': 1,
           'user.username': 1,
           'user.avatar': 1,

@@ -17,6 +17,24 @@ const PostSchema = new Schema({
         type: String,
         required: false
     }],
+    location: {
+        name: {
+            type: String,
+            default: null
+        },
+        latitude: {
+            type: Number,
+            default: null
+        },
+        longitude: {
+            type: Number,
+            default: null
+        },
+        address: {
+            type: String,
+            default: null
+        }
+    },
     createdAt: {
         type: Date,
         default: Date.now
