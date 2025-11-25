@@ -297,18 +297,24 @@ exports.getSavedPosts = async (req, res) => {
     const savedPosts = await SavedPost.find({ userId })
       .populate({
         path: "postId",
+        // Pastikan field createdAt Post diambil
         populate: {
           path: "userId",
           select: "username avatar bio",
         },
       })
-      .sort({ createdAt: -1 })
+      // Biarkan sort berdasarkan savedAt (terbaru) untuk memastikan stabilitas urutan awal Mongoose
+      .sort({ savedAt: -1 }) 
       .lean();
 
     // Filter out null posts (in case post was deleted)
     const posts = savedPosts
       .map((sp) => sp.postId)
       .filter((post) => post !== null);
+
+    // Sort posts berdasarkan Post.createdAt (Terbaru ke Terlama).
+    // Ini akan menimpa urutan SavedAt di JavaScript.
+    posts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     // Add interaction data
     const postsWithDetails = await Promise.all(

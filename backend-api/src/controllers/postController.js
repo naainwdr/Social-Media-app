@@ -191,14 +191,17 @@ exports.getAllPosts = async (req, res) => {
 
     const postsWithDetails = await Promise.all(
       validPosts.map(async (post) => {
-        const [likesCount, commentsCount, isLiked, isSaved] = await Promise.all(
-          [
+        const [likesCount, commentsCount, isLiked, isSaved, firstLike] =
+          await Promise.all([
             Like.countDocuments({ postId: post._id }),
             Comment.countDocuments({ postId: post._id }),
             Like.exists({ postId: post._id, userId: currentUserId }),
             SavedPost.exists({ postId: post._id, userId: currentUserId }),
-          ]
-        );
+            Like.findOne({ postId: post._id })
+              .sort({ createdAt: -1 })
+              .populate("userId", "username avatar")
+              .lean(),
+          ]);
 
         return {
           ...post,
@@ -206,6 +209,7 @@ exports.getAllPosts = async (req, res) => {
           commentsCount,
           isLiked: !!isLiked,
           isSaved: !!isSaved,
+          firstLikedUser: firstLike?.userId || null,
         };
       })
     );
@@ -309,14 +313,17 @@ exports.getFeed = async (req, res) => {
 
     const postsWithDetails = await Promise.all(
       validPosts.map(async (post) => {
-        const [likesCount, commentsCount, isLiked, isSaved] = await Promise.all(
-          [
+        const [likesCount, commentsCount, isLiked, isSaved, firstLike] =
+          await Promise.all([
             Like.countDocuments({ postId: post._id }),
             Comment.countDocuments({ postId: post._id }),
             Like.exists({ postId: post._id, userId: currentUserId }),
             SavedPost.exists({ postId: post._id, userId: currentUserId }),
-          ]
-        );
+            Like.findOne({ postId: post._id })
+              .sort({ createdAt: -1 })
+              .populate("userId", "username avatar")
+              .lean(),
+          ]);
 
         return {
           ...post,
@@ -324,6 +331,7 @@ exports.getFeed = async (req, res) => {
           commentsCount,
           isLiked: !!isLiked,
           isSaved: !!isSaved,
+          firstLikedUser: firstLike?.userId || null,
         };
       })
     );
@@ -366,18 +374,24 @@ exports.getPostById = async (req, res) => {
       });
     }
 
-    const [likesCount, commentsCount, isLiked, isSaved] = await Promise.all([
-      Like.countDocuments({ postId: post._id }),
-      Comment.countDocuments({ postId: post._id }),
-      Like.exists({ postId: post._id, userId: currentUserId }),
-      SavedPost.exists({ postId: post._id, userId: currentUserId }),
-    ]);
+    const [likesCount, commentsCount, isLiked, isSaved, firstLike] =
+      await Promise.all([
+        Like.countDocuments({ postId: post._id }),
+        Comment.countDocuments({ postId: post._id }),
+        Like.exists({ postId: post._id, userId: currentUserId }),
+        SavedPost.exists({ postId: post._id, userId: currentUserId }),
+        Like.findOne({ postId: post._id })
+          .sort({ createdAt: -1 })
+          .populate("userId", "username avatar")
+          .lean(),
+      ]);
 
     res.json({
       success: true,
       message: "Post retrieved successfully",
       data: {
         ...post,
+        firstLikedUser: firstLike?.userId || null,
         likesCount,
         commentsCount,
         isLiked: !!isLiked,
@@ -587,6 +601,50 @@ exports.savePost = async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Terjadi kesalahan",
+    });
+  }
+};
+
+// Get list of users who liked a post
+exports.getLikes = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const currentUserId = req.user?.userId;
+
+    // Ambil semua like untuk post ini
+    const likes = await Like.find({ postId: id })
+      .populate("userId", "username fullName avatar")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Ambil semua userId yang sudah difollow oleh current user
+    let followingSet = new Set();
+    if (currentUserId) {
+      const following = await Follower.find({ followerId: currentUserId }).select("followingId").lean();
+      followingSet = new Set(following.map(f => f.followingId.toString()));
+    }
+
+    // Map user dan tambahkan isFollowing
+    const users = likes.map(like => {
+      const user = like.userId;
+      return {
+        _id: user._id,
+        username: user.username,
+        fullName: user.fullName,
+        avatar: user.avatar,
+        likedAt: like.createdAt,
+        isFollowing: followingSet.has(user._id.toString()),
+      };
+    });
+
+    res.json({
+      success: true,
+      data: { users },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "Failed to get likes",
     });
   }
 };

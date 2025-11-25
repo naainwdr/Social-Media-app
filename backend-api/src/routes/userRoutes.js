@@ -30,8 +30,8 @@ router.put(
 );
 
 // Get followers and following (BEFORE :id route!)
-router.get("/:id/followers", userController.getFollowers);
-router.get("/:id/following", userController.getFollowing);
+router.get("/:id/followers", protect, userController.getFollowers);
+router.get("/:id/following", protect, userController.getFollowing);
 
 // Get user by ID (PUT THIS LAST!)
 router.get("/:id", protect, userController.getUserProfile);
